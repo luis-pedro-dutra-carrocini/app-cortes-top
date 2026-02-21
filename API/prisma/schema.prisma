@@ -1,0 +1,116 @@
+// Configuração básica
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum para distinguir tipos de usuários
+enum UserType {
+  CLIENTE
+  PRESTADOR
+}
+
+// Enum para status do agendamento
+enum AppointmentStatus {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  CONCLUIDO
+}
+
+enum NotificationStatus {
+  ENVIADO
+  EXIBIDO
+  LIDO
+}
+
+model Usuario {
+  UsuarioId        Int      @id @default(autoincrement())
+  UsuarioNome      String   @db.VarChar(100)
+  UsuarioTelefone  String   @db.VarChar(15) @unique
+  UsuarioEmail     String   @db.VarChar(256) @unique
+  UsuarioSenha     String
+  UsuarioTipo      UserType @default(CLIENTE)
+  UsuarioDtCriacao DateTime @default(now())
+
+  // Relações
+  disponibilidades Disponibilidade[]
+  servicos         Servico[]
+  notificacoes     Notificacao[]
+  agendamentos_cli Agendamento[]     @relation("ClienteAgendamentos")
+  agendamentos_pre Agendamento[]     @relation("PrestadorAgendamentos")
+}
+
+model Disponibilidade {
+  Disponibilidadeid           Int      @id @default(autoincrement())
+  PrestadorId                 Int
+  DisponibilidadeData         DateTime @default(now())
+  DisponibilidadeHoraInicio   String   @db.VarChar(5)  // Ex: "08:00"
+  DisponibilidadeHoraFim      String   @db.VarChar(5)  // Ex: "08:45"
+  DisponibilidadeStatus       Boolean  @default(true)
+  
+  prestador    Usuario @relation(fields: [PrestadorId], references: [UsuarioId])
+}
+
+model Servico {
+  ServicoId           Int      @id @default(autoincrement())
+  PrestadorId         Int
+  ServicoNome         String   @db.VarChar(100)
+  ServicoDescricao    String?
+  ServicoTempoMedio   Int      // Em minutos
+  ServicoAtivo        Boolean  @default(true)
+
+  prestador    Usuario  @relation(fields: [PrestadorId], references: [UsuarioId])
+  precos       ServicoPreco[]
+  agendados    ServicoAgendamento[]
+}
+
+model ServicoPreco {
+  ServicoPrecoId         Int      @id @default(autoincrement())
+  ServicoId              Int
+  ServicoValor           Decimal  @db.Decimal(10, 2)
+  ServicoPrecoDtCriacao  DateTime @default(now())
+
+  servico    Servico  @relation(fields: [ServicoId], references: [ServicoId])
+}
+
+model Agendamento {
+  AgendamentoId           Int               @id @default(autoincrement())
+  PrestadorId             Int
+  ClienteId               Int
+  AgendamentoDtCriacao    DateTime          @default(now())
+  AgendamentoDtServico    DateTime                              // Apenas a data
+  AgendamentoHoraServico  String            @db.VarChar(5)      // Ex: "14:30"
+  AgendamentoStatus       AppointmentStatus @default(PENDENTE)
+  AgendamentoValorTotal   Decimal           @db.Decimal(10, 2)
+  AgendamentoTempoGasto   Int                                   // Total em minutos
+
+  prestador    Usuario           @relation("PrestadorAgendamentos", fields: [PrestadorId], references: [UsuarioId])
+  cliente      Usuario           @relation("ClienteAgendamentos", fields: [ClienteId], references: [UsuarioId])
+  servicos     ServicoAgendamento[]
+}
+
+model ServicoAgendamento {
+  ServicoAgendamentoId  Int   @id @default(autoincrement())
+  ServicoId             Int
+  AgendamentoId         Int
+  
+  servico       Servico     @relation(fields: [ServicoId], references: [ServicoId])
+  agendamento   Agendamento @relation(fields: [AgendamentoId], references: [AgendamentoId])
+}
+
+model Notificacao {
+  Notificacaoid             Int                 @id @default(autoincrement())
+  UsuarioId                 Int
+  NotificacaoData           DateTime            @default(now())
+  NotificacaoTipo           String              @db.VarChar(50)
+  NotificacaoTitulo         String              @db.VarChar(100)
+  NotificacaoMensagem       String
+  NotificacaoStatus         NotificationStatus  @default(ENVIADO)
+  
+  usuario    Usuario @relation(fields: [UsuarioId], references: [UsuarioId])
+}
