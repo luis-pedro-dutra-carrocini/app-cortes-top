@@ -15,8 +15,8 @@ class ServicoController {
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem cadastrar serviços' 
+                return res.status(403).json({
+                    error: 'Apenas prestadores podem cadastrar serviços'
                 });
             }
 
@@ -117,18 +117,18 @@ class ServicoController {
                 ServicoTempoMedio: servico.ServicoTempoMedio,
                 ServicoAtivo: servico.ServicoAtivo,
                 prestador: servico.prestador,
-                precoAtual: servico.precos && servico.precos.length > 0 
-                    ? parseFloat(servico.precos[0].ServicoValor) 
+                precoAtual: servico.precos && servico.precos.length > 0
+                    ? parseFloat(servico.precos[0].ServicoValor)
                     : null,
-                ultimoPreco: servico.precos && servico.precos.length > 0 
+                ultimoPreco: servico.precos && servico.precos.length > 0
                     ? {
                         valor: parseFloat(servico.precos[0].ServicoValor),
                         dataCriacao: servico.precos[0].ServicoPrecoDtCriacao
-                      }
+                    }
                     : null
             }));
 
-            res.status(200).json({ 
+            res.status(200).json({
                 data: servicosFormatados,
                 prestador: {
                     id: prestador.UsuarioId,
@@ -163,8 +163,8 @@ class ServicoController {
             }
 
             if (prestador.UsuarioId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode acessar todos os seus próprios serviços' 
+                return res.status(403).json({
+                    error: 'Você só pode acessar todos os seus próprios serviços'
                 });
             }
 
@@ -203,18 +203,18 @@ class ServicoController {
                 ServicoTempoMedio: servico.ServicoTempoMedio,
                 ServicoAtivo: servico.ServicoAtivo,
                 prestador: servico.prestador,
-                precoAtual: servico.precos && servico.precos.length > 0 
-                    ? parseFloat(servico.precos[0].ServicoValor) 
+                precoAtual: servico.precos && servico.precos.length > 0
+                    ? parseFloat(servico.precos[0].ServicoValor)
                     : null,
-                ultimoPreco: servico.precos && servico.precos.length > 0 
+                ultimoPreco: servico.precos && servico.precos.length > 0
                     ? {
                         valor: parseFloat(servico.precos[0].ServicoValor),
                         dataCriacao: servico.precos[0].ServicoPrecoDtCriacao
-                      }
+                    }
                     : null
             }));
 
-            res.status(200).json({ 
+            res.status(200).json({
                 data: servicosFormatados,
                 prestador: {
                     id: prestador.UsuarioId,
@@ -273,8 +273,8 @@ class ServicoController {
                     ...preco,
                     ServicoValor: parseFloat(preco.ServicoValor)
                 })),
-                precoAtual: servico.precos && servico.precos.length > 0 
-                    ? parseFloat(servico.precos[0].ServicoValor) 
+                precoAtual: servico.precos && servico.precos.length > 0
+                    ? parseFloat(servico.precos[0].ServicoValor)
                     : null
             };
 
@@ -301,8 +301,8 @@ class ServicoController {
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem atualizar serviços' 
+                return res.status(403).json({
+                    error: 'Apenas prestadores podem atualizar serviços'
                 });
             }
 
@@ -317,8 +317,8 @@ class ServicoController {
 
             // Verificar se o serviço pertence ao prestador logado
             if (servico.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode atualizar seus próprios serviços' 
+                return res.status(403).json({
+                    error: 'Você só pode atualizar seus próprios serviços'
                 });
             }
 
@@ -359,8 +359,8 @@ class ServicoController {
             // Formatar resposta
             const respostaFormatada = {
                 ...servicoAtualizado,
-                precoAtual: servicoAtualizado.precos && servicoAtualizado.precos.length > 0 
-                    ? parseFloat(servicoAtualizado.precos[0].ServicoValor) 
+                precoAtual: servicoAtualizado.precos && servicoAtualizado.precos.length > 0
+                    ? parseFloat(servicoAtualizado.precos[0].ServicoValor)
                     : null
             };
 
@@ -384,21 +384,14 @@ class ServicoController {
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem excluir serviços' 
+                return res.status(403).json({
+                    error: 'Apenas prestadores podem excluir serviços'
                 });
             }
 
-            // Buscar o serviço com seus agendamentos
+            // Buscar o serviço
             const servico = await prisma.servico.findUnique({
-                where: { ServicoId: servicoId },
-                include: {
-                    agendados: {
-                        where: {
-                            AgendamentoStatus: 'PENDENTE'
-                        }
-                    }
-                }
+                where: { ServicoId: servicoId }
             });
 
             if (!servico) {
@@ -407,15 +400,28 @@ class ServicoController {
 
             // Verificar se o serviço pertence ao prestador logado
             if (servico.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode excluir seus próprios serviços' 
+                return res.status(403).json({
+                    error: 'Você só pode excluir seus próprios serviços'
                 });
             }
 
-            // Verificar se existem agendamentos pendentes (se o campo existir)
-            if (servico.agendados && servico.agendados.length > 0) {
-                return res.status(400).json({ 
-                    error: 'Não é possível excluir um serviço com agendamentos pendentes' 
+            // CORREÇÃO: Verificar se existem agendamentos relacionados ao serviço
+            const agendamentosRelacionados = await prisma.servicoAgendamento.findMany({
+                where: {
+                    ServicoId: servicoId
+                },
+                include: {
+                    agendamento: {
+                        select: {
+                            AgendamentoStatus: true
+                        }
+                    }
+                }
+            });
+
+            if (agendamentosRelacionados.length > 0) {
+                return res.status(400).json({
+                    error: 'Não é possível excluir um serviço que possui agendamentos vinculados'
                 });
             }
 
@@ -447,15 +453,15 @@ class ServicoController {
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem alterar o status do serviço' 
+                return res.status(403).json({
+                    error: 'Apenas prestadores podem alterar o status do serviço'
                 });
             }
 
             // Validar parâmetro
             if (ativo === undefined || typeof ativo !== 'boolean') {
-                return res.status(400).json({ 
-                    error: 'O campo "ativo" é obrigatório e deve ser true ou false' 
+                return res.status(400).json({
+                    error: 'O campo "ativo" é obrigatório e deve ser true ou false'
                 });
             }
 
@@ -470,8 +476,35 @@ class ServicoController {
 
             // Verificar se o serviço pertence ao prestador logado
             if (servico.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode alterar o status dos seus próprios serviços' 
+                return res.status(403).json({
+                    error: 'Você só pode alterar o status dos seus próprios serviços'
+                });
+            }
+
+            // CORREÇÃO: Verificar se existem agendamentos ativos relacionados ao serviço
+            const agendamentosRelacionados = await prisma.servicoAgendamento.findMany({
+                where: {
+                    ServicoId: servicoId
+                },
+                include: {
+                    agendamento: {
+                        select: {
+                            AgendamentoStatus: true
+                        }
+                    }
+                }
+            });
+
+            // Filtrar apenas agendamentos não cancelados
+            const agendamentosAtivos = agendamentosRelacionados.filter(sa =>
+                sa.agendamento.AgendamentoStatus !== 'CANCELADO' &&
+                sa.agendamento.AgendamentoStatus !== 'CONCLUIDO'
+            );
+
+            // Se estiver tentando desativar e existem agendamentos ativos
+            if (!ativo && agendamentosAtivos.length > 0) {
+                return res.status(400).json({
+                    error: 'Não é possível desativar um serviço que possui agendamentos pendentes ou confirmados'
                 });
             }
 

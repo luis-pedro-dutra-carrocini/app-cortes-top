@@ -8,21 +8,27 @@ class AgendamentoController {
         try {
             const {
                 PrestadorId,
+                DisponibilidadeId,
                 AgendamentoDtServico,
                 AgendamentoHoraServico,
+                AgendamentoObservacao,
                 servicos // Array de IDs dos serviços
             } = req.body;
 
             // Verificar se o usuário é CLIENTE
             if (req.usuario.usuarioTipo !== 'CLIENTE') {
-                return res.status(403).json({ 
-                    error: 'Apenas clientes podem realizar agendamentos' 
+                return res.status(403).json({
+                    error: 'Apenas clientes podem realizar agendamentos'
                 });
             }
 
             // Validações básicas
             if (!PrestadorId) {
                 return res.status(400).json({ error: 'ID do prestador é obrigatório' });
+            }
+
+            if (!DisponibilidadeId) {
+                return res.status(400).json({ error: 'ID da disponibilidade é obrigatório' });
             }
 
             if (!AgendamentoDtServico) {
@@ -47,7 +53,7 @@ class AgendamentoController {
             const dataServico = new Date(AgendamentoDtServico);
             const hoje = new Date();
             hoje.setHours(0, 0, 0, 0);
-            
+
             if (dataServico < hoje) {
                 return res.status(400).json({ error: 'A data do serviço deve ser futura' });
             }
@@ -83,26 +89,38 @@ class AgendamentoController {
             });
 
             if (servicosEncontrados.length !== servicos.length) {
-                return res.status(400).json({ 
-                    error: 'Um ou mais serviços são inválidos ou não pertencem ao prestador' 
+                return res.status(400).json({
+                    error: 'Um ou mais serviços são inválidos ou não pertencem ao prestador'
                 });
             }
 
             // Verificar disponibilidade do prestador
             const diaSemana = dataServico.getDay(); // 0-6 (domingo-sábado)
-            
-            const disponibilidade = await prisma.disponibilidade.findFirst({
+
+            // Verificar disponibilidade pelo ID específico
+            const disponibilidade = await prisma.disponibilidade.findUnique({
                 where: {
-                    PrestadorId: parseInt(PrestadorId),
-                    DisponibilidadeDiaSemana: diaSemana,
-                    DisponibilidadeHoraInicio: { lte: AgendamentoHoraServico },
-                    DisponibilidadeHoraFim: { gt: AgendamentoHoraServico }
+                    DisponibilidadeId: parseInt(DisponibilidadeId)
                 }
             });
 
             if (!disponibilidade) {
-                return res.status(400).json({ 
-                    error: 'Prestador não disponível neste dia e horário' 
+                return res.status(400).json({
+                    error: 'Disponibilidade não encontrada'
+                });
+            }
+
+            // Verificar se a disponibilidade pertence ao prestador
+            if (disponibilidade.PrestadorId !== parseInt(PrestadorId)) {
+                return res.status(400).json({
+                    error: 'Disponibilidade não pertence ao prestador informado'
+                });
+            }
+
+            // Verificar se a disponibilidade está ativa
+            if (!disponibilidade.DisponibilidadeStatus) {
+                return res.status(400).json({
+                    error: 'Disponibilidade inativa'
                 });
             }
 
@@ -117,8 +135,8 @@ class AgendamentoController {
             });
 
             if (conflito) {
-                return res.status(409).json({ 
-                    error: 'Já existe um agendamento para este horário' 
+                return res.status(409).json({
+                    error: 'Já existe um agendamento para este horário'
                 });
             }
 
@@ -140,17 +158,25 @@ class AgendamentoController {
                     data: {
                         PrestadorId: parseInt(PrestadorId),
                         ClienteId: req.usuario.usuarioId,
+                        DisponibilidadeId: parseInt(DisponibilidadeId),
                         AgendamentoDtServico: dataServico,
                         AgendamentoHoraServico: AgendamentoHoraServico,
                         AgendamentoValorTotal: valorTotal,
                         AgendamentoTempoGasto: tempoTotal,
-                        AgendamentoStatus: 'PENDENTE'
+                        AgendamentoStatus: 'PENDENTE',
+                        AgendamentoObservacao: AgendamentoObservacao || null
                     }
+                });
+
+                // Atualizar disponibilidade para INATIVA
+                const disponibilidadeAtualizada = await prisma.disponibilidade.update({
+                    where: { DisponibilidadeId: parseInt(DisponibilidadeId) },
+                    data: { DisponibilidadeStatus: false }
                 });
 
                 // Criar relações com serviços
                 const servicosAgendamento = await Promise.all(
-                    servicosEncontrados.map(servico => 
+                    servicosEncontrados.map(servico =>
                         prisma.servicoAgendamento.create({
                             data: {
                                 AgendamentoId: agendamento.AgendamentoId,
@@ -208,8 +234,8 @@ class AgendamentoController {
                     ServicoAgendamentoId: sa.ServicoAgendamentoId,
                     servico: {
                         ...sa.servico,
-                        precoAtual: sa.servico.precos && sa.servico.precos.length > 0 
-                            ? parseFloat(sa.servico.precos[0].ServicoValor) 
+                        precoAtual: sa.servico.precos && sa.servico.precos.length > 0
+                            ? parseFloat(sa.servico.precos[0].ServicoValor)
                             : null
                     }
                 }))
@@ -229,11 +255,12 @@ class AgendamentoController {
     }
 
     // Listar agendamentos do cliente logado
-    async listarMeusAgendamentosCliente(req, res) {
+    async listarMeusAgendamentosClientePendentes(req, res) {
         try {
             const agendamentos = await prisma.agendamento.findMany({
                 where: {
-                    ClienteId: req.usuario.usuarioId
+                    ClienteId: req.usuario.usuarioId,
+                    AgendamentoStatus: 'PENDENTE' // Exibir apenas agendamentos futuros ou pendentes
                 },
                 include: {
                     prestador: {
@@ -274,7 +301,7 @@ class AgendamentoController {
                 servicos: ag.servicos.map(s => s.servico)
             }));
 
-            res.status(200).json({ 
+            res.status(200).json({
                 data: agendamentosFormatados,
                 total: agendamentos.length
             });
@@ -292,8 +319,8 @@ class AgendamentoController {
         try {
             // Verificar se é prestador
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem acessar esta rota' 
+                return res.status(403).json({
+                    error: 'Apenas prestadores podem acessar esta rota'
                 });
             }
 
@@ -340,7 +367,7 @@ class AgendamentoController {
                 servicos: ag.servicos.map(s => s.servico)
             }));
 
-            res.status(200).json({ 
+            res.status(200).json({
                 data: agendamentosFormatados,
                 total: agendamentos.length
             });
@@ -400,10 +427,10 @@ class AgendamentoController {
             }
 
             // Verificar se o usuário tem permissão (é o cliente ou o prestador)
-            if (agendamento.ClienteId !== req.usuario.usuarioId && 
+            if (agendamento.ClienteId !== req.usuario.usuarioId &&
                 agendamento.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você não tem permissão para visualizar este agendamento' 
+                return res.status(403).json({
+                    error: 'Você não tem permissão para visualizar este agendamento'
                 });
             }
 
@@ -440,10 +467,10 @@ class AgendamentoController {
             const { AgendamentoStatus } = req.body;
 
             const statusValidos = ['PENDENTE', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO'];
-            
+
             if (!AgendamentoStatus || !statusValidos.includes(AgendamentoStatus)) {
-                return res.status(400).json({ 
-                    error: 'Status inválido. Use: PENDENTE, CONFIRMADO, EM_ANDAMENTO, CONCLUIDO, CANCELADO' 
+                return res.status(400).json({
+                    error: 'Status inválido. Use: PENDENTE, CONFIRMADO, EM_ANDAMENTO, CONCLUIDO, CANCELADO'
                 });
             }
 
@@ -457,10 +484,10 @@ class AgendamentoController {
             }
 
             // Verificar permissão (cliente ou prestador)
-            if (agendamento.ClienteId !== req.usuario.usuarioId && 
+            if (agendamento.ClienteId !== req.usuario.usuarioId &&
                 agendamento.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você não tem permissão para alterar este agendamento' 
+                return res.status(403).json({
+                    error: 'Você não tem permissão para alterar este agendamento'
                 });
             }
 
@@ -474,8 +501,8 @@ class AgendamentoController {
             };
 
             if (!transicoesValidas[agendamento.AgendamentoStatus].includes(AgendamentoStatus)) {
-                return res.status(400).json({ 
-                    error: `Não é possível mudar de ${agendamento.AgendamentoStatus} para ${AgendamentoStatus}` 
+                return res.status(400).json({
+                    error: `Não é possível mudar de ${agendamento.AgendamentoStatus} para ${AgendamentoStatus}`
                 });
             }
 
@@ -525,6 +552,320 @@ class AgendamentoController {
         }
     }
 
+    // Atualizar agendamento (apenas CLIENTE, apenas PENDENTE)
+    async atualizarAgendamento(req, res) {
+        try {
+            const agendamentoId = parseInt(req.params.id);
+            const {
+                DisponibilidadeId, // NOVO: ID da disponibilidade selecionada
+                AgendamentoDtServico,
+                AgendamentoHoraServico,
+                AgendamentoObservacao,
+                servicos // Array de IDs dos serviços
+            } = req.body;
+
+            // Buscar agendamento existente
+            const agendamentoExistente = await prisma.agendamento.findUnique({
+                where: { AgendamentoId: agendamentoId },
+                include: {
+                    servicos: true
+                }
+            });
+
+            if (!agendamentoExistente) {
+                return res.status(404).json({ error: 'Agendamento não encontrado' });
+            }
+
+            // Verificar permissão (apenas o cliente dono do agendamento)
+            if (agendamentoExistente.ClienteId !== req.usuario.usuarioId) {
+                return res.status(403).json({
+                    error: 'Você só pode editar seus próprios agendamentos'
+                });
+            }
+
+            // Verificar se o agendamento está em status que permite edição
+            if (agendamentoExistente.AgendamentoStatus !== 'PENDENTE') {
+                return res.status(400).json({
+                    error: 'Apenas agendamentos com status PENDENTE podem ser editados'
+                });
+            }
+
+            // Validações básicas
+            if (AgendamentoDtServico) {
+                const dataServico = new Date(AgendamentoDtServico);
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+
+                if (dataServico < hoje) {
+                    return res.status(400).json({ error: 'A data do serviço deve ser futura' });
+                }
+            }
+
+            if (AgendamentoHoraServico) {
+                const horaRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!horaRegex.test(AgendamentoHoraServico)) {
+                    return res.status(400).json({ error: 'Hora do serviço deve estar no formato HH:MM (ex: 14:30)' });
+                }
+            }
+
+            // NOVA LÓGICA: Verificar se a disponibilidade foi alterada
+            const disponibilidadeAlterada = DisponibilidadeId &&
+                DisponibilidadeId !== agendamentoExistente.DisponibilidadeId;
+
+            if (disponibilidadeAlterada) {
+                // Verificar se a nova disponibilidade existe e está ativa
+                const novaDisponibilidade = await prisma.disponibilidade.findUnique({
+                    where: { DisponibilidadeId: parseInt(DisponibilidadeId) }
+                });
+
+                if (!novaDisponibilidade) {
+                    return res.status(400).json({
+                        error: 'Disponibilidade não encontrada'
+                    });
+                }
+
+                if (!novaDisponibilidade.DisponibilidadeStatus) {
+                    return res.status(400).json({
+                        error: 'Disponibilidade selecionada não está mais disponível'
+                    });
+                }
+
+                // Verificar se a nova disponibilidade pertence ao mesmo prestador
+                if (novaDisponibilidade.PrestadorId !== agendamentoExistente.PrestadorId) {
+                    return res.status(400).json({
+                        error: 'Disponibilidade não pertence ao prestador do agendamento'
+                    });
+                }
+
+                // Verificar se a data/hora da nova disponibilidade corresponde à selecionada
+                /*if (AgendamentoDtServico || AgendamentoHoraServico) {
+                    const dataComparar = AgendamentoDtServico
+                        ? new Date(AgendamentoDtServico)
+                        : agendamentoExistente.AgendamentoDtServico;
+
+                    const horaComparar = AgendamentoHoraServico || agendamentoExistente.AgendamentoHoraServico;
+
+                    // Verificar se a disponibilidade cobre o horário selecionado
+                    if (novaDisponibilidade.DisponibilidadeData.toDateString() !== dataComparar.toDateString() ||
+                        novaDisponibilidade.DisponibilidadeHoraInicio > horaComparar ||
+                        novaDisponibilidade.DisponibilidadeHoraFim <= horaComparar) {
+                        return res.status(400).json({
+                            error: 'A disponibilidade selecionada não corresponde ao horário escolhido'
+                        });
+                    }
+                }*/
+            }
+
+            // Se houver alteração de data/hora (mesmo sem mudar disponibilidade), verificar disponibilidade
+            if (!disponibilidadeAlterada && (AgendamentoDtServico || AgendamentoHoraServico)) {
+                const novaData = AgendamentoDtServico
+                    ? new Date(AgendamentoDtServico)
+                    : agendamentoExistente.AgendamentoDtServico;
+
+                const novaHora = AgendamentoHoraServico || agendamentoExistente.AgendamentoHoraServico;
+
+                // Verificar se a disponibilidade original ainda cobre o novo horário
+                const disponibilidadeOriginal = await prisma.disponibilidade.findUnique({
+                    where: { DisponibilidadeId: agendamentoExistente.DisponibilidadeId }
+                });
+
+                if (!disponibilidadeOriginal || !disponibilidadeOriginal.DisponibilidadeStatus) {
+                    return res.status(400).json({
+                        error: 'A disponibilidade original não está mais disponível'
+                    });
+                }
+
+                if (disponibilidadeOriginal.DisponibilidadeData.toDateString() !== novaData.toDateString() ||
+                    disponibilidadeOriginal.DisponibilidadeHoraInicio > novaHora ||
+                    disponibilidadeOriginal.DisponibilidadeHoraFim <= novaHora) {
+                    return res.status(400).json({
+                        error: 'O novo horário não é coberto pela disponibilidade original'
+                    });
+                }
+            }
+
+            // Verificar conflito de horário com outros agendamentos (excluindo o atual)
+            const novaData = AgendamentoDtServico
+                ? new Date(AgendamentoDtServico)
+                : agendamentoExistente.AgendamentoDtServico;
+
+            const novaHora = AgendamentoHoraServico || agendamentoExistente.AgendamentoHoraServico;
+
+            const conflito = await prisma.agendamento.findFirst({
+                where: {
+                    PrestadorId: agendamentoExistente.PrestadorId,
+                    AgendamentoId: { not: agendamentoId },
+                    AgendamentoDtServico: novaData,
+                    AgendamentoHoraServico: novaHora,
+                    AgendamentoStatus: { notIn: ['CANCELADO', 'CONCLUIDO'] }
+                }
+            });
+
+            if (conflito) {
+                return res.status(409).json({
+                    error: 'Já existe um agendamento para este horário'
+                });
+            }
+
+            // Se houver alteração nos serviços, recalcular totais
+            let valorTotal = agendamentoExistente.AgendamentoValorTotal;
+            let tempoTotal = agendamentoExistente.AgendamentoTempoGasto;
+
+            if (servicos && servicos.length > 0) {
+                // Buscar serviços com preços atuais
+                const servicosEncontrados = await prisma.servico.findMany({
+                    where: {
+                        ServicoId: { in: servicos.map(id => parseInt(id)) },
+                        PrestadorId: agendamentoExistente.PrestadorId,
+                        ServicoAtivo: true
+                    },
+                    include: {
+                        precos: {
+                            orderBy: {
+                                ServicoPrecoDtCriacao: 'desc'
+                            },
+                            take: 1
+                        }
+                    }
+                });
+
+                if (servicosEncontrados.length !== servicos.length) {
+                    return res.status(400).json({
+                        error: 'Um ou mais serviços são inválidos ou não pertencem ao prestador'
+                    });
+                }
+
+                // Recalcular totais
+                valorTotal = 0;
+                tempoTotal = 0;
+
+                servicosEncontrados.forEach(servico => {
+                    if (servico.precos && servico.precos.length > 0) {
+                        valorTotal += parseFloat(servico.precos[0].ServicoValor);
+                    }
+                    tempoTotal += servico.ServicoTempoMedio;
+                });
+            }
+
+            // Atualizar agendamento em transação
+            const resultado = await prisma.$transaction(async (prisma) => {
+                // Se a disponibilidade foi alterada
+                if (disponibilidadeAlterada) {
+                    // Reativar a disponibilidade antiga
+                    await prisma.disponibilidade.update({
+                        where: { DisponibilidadeId: agendamentoExistente.DisponibilidadeId },
+                        data: { DisponibilidadeStatus: true }
+                    });
+
+                    // Desativar a nova disponibilidade
+                    await prisma.disponibilidade.update({
+                        where: { DisponibilidadeId: parseInt(DisponibilidadeId) },
+                        data: { DisponibilidadeStatus: false }
+                    });
+                }
+
+                // Se os serviços foram alterados, remover os antigos e adicionar os novos
+                if (servicos && servicos.length > 0) {
+                    // Remover relações antigas
+                    await prisma.servicoAgendamento.deleteMany({
+                        where: { AgendamentoId: agendamentoId }
+                    });
+
+                    // Adicionar novas relações
+                    await Promise.all(
+                        servicos.map(servicoId =>
+                            prisma.servicoAgendamento.create({
+                                data: {
+                                    AgendamentoId: agendamentoId,
+                                    ServicoId: parseInt(servicoId)
+                                }
+                            })
+                        )
+                    );
+                }
+
+                // Atualizar agendamento
+                const agendamentoAtualizado = await prisma.agendamento.update({
+                    where: { AgendamentoId: agendamentoId },
+                    data: {
+                        DisponibilidadeId: disponibilidadeAlterada
+                            ? parseInt(DisponibilidadeId)
+                            : agendamentoExistente.DisponibilidadeId,
+                        AgendamentoDtServico: AgendamentoDtServico
+                            ? new Date(AgendamentoDtServico)
+                            : agendamentoExistente.AgendamentoDtServico,
+                        AgendamentoHoraServico: AgendamentoHoraServico || agendamentoExistente.AgendamentoHoraServico,
+                        AgendamentoValorTotal: valorTotal,
+                        AgendamentoTempoGasto: tempoTotal,
+                        AgendamentoObservacao: AgendamentoObservacao !== undefined
+                            ? AgendamentoObservacao
+                            : agendamentoExistente.AgendamentoObservacao
+                    },
+                    include: {
+                        prestador: {
+                            select: {
+                                UsuarioId: true,
+                                UsuarioNome: true,
+                                UsuarioEmail: true,
+                                UsuarioTelefone: true
+                            }
+                        },
+                        cliente: {
+                            select: {
+                                UsuarioId: true,
+                                UsuarioNome: true,
+                                UsuarioEmail: true,
+                                UsuarioTelefone: true
+                            }
+                        },
+                        servicos: {
+                            include: {
+                                servico: {
+                                    include: {
+                                        precos: {
+                                            orderBy: {
+                                                ServicoPrecoDtCriacao: 'desc'
+                                            },
+                                            take: 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                return agendamentoAtualizado;
+            });
+
+            // Formatar resposta
+            const respostaFormatada = {
+                ...resultado,
+                AgendamentoValorTotal: parseFloat(resultado.AgendamentoValorTotal),
+                servicos: resultado.servicos.map(sa => ({
+                    ServicoAgendamentoId: sa.ServicoAgendamentoId,
+                    servico: {
+                        ...sa.servico,
+                        precoAtual: sa.servico.precos && sa.servico.precos.length > 0
+                            ? parseFloat(sa.servico.precos[0].ServicoValor)
+                            : null
+                    }
+                }))
+            };
+
+            res.status(200).json({
+                message: 'Agendamento atualizado com sucesso',
+                data: respostaFormatada
+            });
+
+        } catch (error) {
+            console.error('Erro ao atualizar agendamento:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
     // Cancelar agendamento (apenas cliente ou prestador)
     async cancelarAgendamento(req, res) {
         try {
@@ -540,23 +881,23 @@ class AgendamentoController {
             }
 
             // Verificar permissão (cliente ou prestador)
-            if (agendamento.ClienteId !== req.usuario.usuarioId && 
+            if (agendamento.ClienteId !== req.usuario.usuarioId &&
                 agendamento.PrestadorId !== req.usuario.usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você não tem permissão para cancelar este agendamento' 
+                return res.status(403).json({
+                    error: 'Você não tem permissão para cancelar este agendamento'
                 });
             }
 
             // Verificar se pode cancelar
             if (agendamento.AgendamentoStatus === 'CONCLUIDO') {
-                return res.status(400).json({ 
-                    error: 'Não é possível cancelar um agendamento concluído' 
+                return res.status(400).json({
+                    error: 'Não é possível cancelar um agendamento concluído'
                 });
             }
 
             if (agendamento.AgendamentoStatus === 'CANCELADO') {
-                return res.status(400).json({ 
-                    error: 'Agendamento já está cancelado' 
+                return res.status(400).json({
+                    error: 'Agendamento já está cancelado'
                 });
             }
 
@@ -580,6 +921,12 @@ class AgendamentoController {
                 }
             });
 
+            // Reativar disponibilidade associada
+            await prisma.disponibilidade.update({
+                where: { DisponibilidadeId: agendamento.DisponibilidadeId },
+                data: { DisponibilidadeStatus: true }
+            });
+
             res.status(200).json({
                 message: 'Agendamento cancelado com sucesso',
                 data: {
@@ -600,8 +947,8 @@ class AgendamentoController {
             const { dataInicio, dataFim } = req.query;
 
             if (!dataInicio || !dataFim) {
-                return res.status(400).json({ 
-                    error: 'Data de início e data de fim são obrigatórias' 
+                return res.status(400).json({
+                    error: 'Data de início e data de fim são obrigatórias'
                 });
             }
 
@@ -666,7 +1013,7 @@ class AgendamentoController {
                 servicos: ag.servicos.map(s => s.servico)
             }));
 
-            res.status(200).json({ 
+            res.status(200).json({
                 data: agendamentosFormatados,
                 total: agendamentos.length,
                 periodo: {

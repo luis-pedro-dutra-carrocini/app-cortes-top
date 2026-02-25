@@ -20,6 +20,8 @@ enum AppointmentStatus {
   CONFIRMADO
   CANCELADO
   CONCLUIDO
+  EM_ANDAMENTO
+  RECUSADO
 }
 
 enum NotificationStatus {
@@ -46,14 +48,16 @@ model Usuario {
 }
 
 model Disponibilidade {
-  Disponibilidadeid           Int      @id @default(autoincrement())
+  DisponibilidadeId           Int      @id @default(autoincrement())
   PrestadorId                 Int
-  DisponibilidadeData         DateTime @default(now())
+  DisponibilidadeData         DateTime
   DisponibilidadeHoraInicio   String   @db.VarChar(5)  // Ex: "08:00"
   DisponibilidadeHoraFim      String   @db.VarChar(5)  // Ex: "08:45"
   DisponibilidadeStatus       Boolean  @default(true)
+  DisponibilidadeDiaSemana    Int                     //  0 = Domingo, 1 = Segunda, ..., 6 = Sábado
   
   prestador    Usuario @relation(fields: [PrestadorId], references: [UsuarioId])
+  agendamento  Agendamento[]
 }
 
 model Servico {
@@ -79,18 +83,22 @@ model ServicoPreco {
 }
 
 model Agendamento {
-  AgendamentoId           Int               @id @default(autoincrement())
-  PrestadorId             Int
-  ClienteId               Int
-  AgendamentoDtCriacao    DateTime          @default(now())
-  AgendamentoDtServico    DateTime                              // Apenas a data
-  AgendamentoHoraServico  String            @db.VarChar(5)      // Ex: "14:30"
-  AgendamentoStatus       AppointmentStatus @default(PENDENTE)
-  AgendamentoValorTotal   Decimal           @db.Decimal(10, 2)
-  AgendamentoTempoGasto   Int                                   // Total em minutos
+  AgendamentoId                 Int               @id @default(autoincrement())
+  PrestadorId                   Int
+  ClienteId                     Int
+  DisponibilidadeId             Int
+  AgendamentoDtCriacao          DateTime          @default(now())
+  AgendamentoDtServico          DateTime                              // Apenas a data
+  AgendamentoHoraServico        String            @db.VarChar(5)      // Ex: "14:30"
+  AgendamentoStatus             AppointmentStatus @default(PENDENTE)
+  AgendamentoValorTotal         Decimal           @db.Decimal(10, 2)
+  AgendamentoTempoGasto         Int                                   // Total em minutos
+  AgendamentoObservacao         String?
+  AgendamentoDescricaoTrabalho  String?                               // Descrição do trabalho realizado (após conclusão)
 
   prestador    Usuario           @relation("PrestadorAgendamentos", fields: [PrestadorId], references: [UsuarioId])
   cliente      Usuario           @relation("ClienteAgendamentos", fields: [ClienteId], references: [UsuarioId])
+  disponibilidade Disponibilidade @relation(fields: [DisponibilidadeId], references: [DisponibilidadeId])
   servicos     ServicoAgendamento[]
 }
 

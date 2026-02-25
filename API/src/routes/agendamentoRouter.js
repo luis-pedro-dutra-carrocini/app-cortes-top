@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Rotas específicas por tipo de usuário
-router.get('/meus-cliente', agendamentoController.listarMeusAgendamentosCliente);
+router.get('/meus-cliente', agendamentoController.listarMeusAgendamentosClientePendentes);
 router.get('/meus-prestador', agendamentoController.listarMeusAgendamentosPrestador);
 router.get('/periodo', agendamentoController.listarAgendamentosPorPeriodo);
 
@@ -17,6 +17,9 @@ router.get('/periodo', agendamentoController.listarAgendamentosPorPeriodo);
 router.post('/', agendamentoController.cadastrarAgendamento); // Apenas CLIENTE
 router.put('/:id/status', agendamentoController.atualizarStatus); // Cliente ou Prestador
 router.patch('/:agendamentoId/cancelar', agendamentoController.cancelarAgendamento); // Cliente ou Prestador
+
+// Apenas Cliente
+router.put('/:id', agendamentoController.atualizarAgendamento);
 
 // Rota de consulta por ID (protegida - apenas envolvidos)
 router.get('/:agendamentoId', agendamentoController.buscarAgendamentoId);

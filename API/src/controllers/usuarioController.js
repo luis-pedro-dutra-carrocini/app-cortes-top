@@ -11,8 +11,8 @@ class UsuarioController {
             const { UsuarioEmail, UsuarioSenha } = req.body;
 
             if (!UsuarioEmail || !UsuarioSenha) {
-                return res.status(400).json({ 
-                    error: 'E-mail e senha são obrigatórios' 
+                return res.status(400).json({
+                    error: 'E-mail e senha são obrigatórios'
                 });
             }
 
@@ -22,8 +22,8 @@ class UsuarioController {
             });
 
             if (!usuario) {
-                return res.status(401).json({ 
-                    error: 'E-mail ou senha inválidos' 
+                return res.status(401).json({
+                    error: 'E-mail ou senha inválidos'
                 });
             }
 
@@ -31,14 +31,14 @@ class UsuarioController {
             const senhaValida = await bcrypt.compare(UsuarioSenha, usuario.UsuarioSenha);
 
             if (!senhaValida) {
-                return res.status(401).json({ 
-                    error: 'E-mail ou senha inválidos' 
+                return res.status(401).json({
+                    error: 'E-mail ou senha inválidos'
                 });
             }
 
             // Gerar token JWT
             const token = jwt.sign(
-                { 
+                {
                     usuarioId: usuario.UsuarioId,
                     usuarioTipo: usuario.UsuarioTipo,
                     usuarioEmail: usuario.UsuarioEmail
@@ -90,6 +90,121 @@ class UsuarioController {
 
         } catch (error) {
             console.error('Erro ao buscar usuário:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
+    // Listar últimos prestadores utilizados pelo cliente (apenas CLIENTE)
+    async listarUltimosPrestadoresCliente(req, res) {
+        try {
+            // Verificar se o usuário é CLIENTE
+            if (req.usuario.usuarioTipo !== 'CLIENTE') {
+                return res.status(403).json({
+                    error: 'Apenas clientes podem acessar seus últimos prestadores'
+                });
+            }
+
+            const clienteId = req.usuario.usuarioId;
+
+            // Buscar os últimos 5 prestadores com quem o cliente já agendou
+            const ultimosPrestadores = await prisma.agendamento.findMany({
+                where: {
+                    ClienteId: clienteId
+                },
+                select: {
+                    prestador: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true,
+                            UsuarioEmail: true,
+                            UsuarioTelefone: true,
+                            UsuarioTipo: true
+                        }
+                    },
+                    AgendamentoDtCriacao: true
+                },
+                distinct: ['PrestadorId'],
+                orderBy: {
+                    AgendamentoDtCriacao: 'desc'
+                },
+                take: 5
+            });
+
+            // Extrair apenas os dados do prestador
+            const prestadores = ultimosPrestadores.map(item => ({
+                ...item.prestador,
+                ultimoAgendamento: item.AgendamentoDtCriacao
+            }));
+
+            res.status(200).json({
+                data: prestadores,
+                total: prestadores.length
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar últimos prestadores:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
+    // Pesquisar prestadores por nome ou telefone (qualquer usuário logado)
+    async pesquisarPrestadores(req, res) {
+        try {
+            const { nome, telefone } = req.query;
+
+            // Validar se pelo menos um parâmetro foi fornecido
+            if (!nome && !telefone) {
+                return res.status(400).json({
+                    error: 'Informe nome ou telefone para pesquisa'
+                });
+            }
+
+            // Construir filtro de busca
+            const where = {
+                UsuarioTipo: 'PRESTADOR'
+            };
+
+            if (nome && nome.trim() !== '') {
+                where.UsuarioNome = {
+                    contains: nome.trim(),
+                    mode: 'insensitive' // Case insensitive
+                };
+            }
+
+            if (telefone && telefone.trim() !== '') {
+                where.UsuarioTelefone = {
+                    contains: telefone.trim()
+                };
+            }
+
+            // Buscar prestadores
+            const prestadores = await prisma.usuario.findMany({
+                where: where,
+                select: {
+                    UsuarioId: true,
+                    UsuarioNome: true,
+                    UsuarioEmail: true,
+                    UsuarioTelefone: true,
+                    UsuarioTipo: true
+                },
+                orderBy: {
+                    UsuarioNome: 'asc'
+                },
+                take: 20 // Limitar a 20 resultados
+            });
+
+            res.status(200).json({
+                data: prestadores,
+                total: prestadores.length,
+                termo: { nome, telefone }
+            });
+
+        } catch (error) {
+            console.error('Erro ao pesquisar prestadores:', error);
             res.status(500).json({
                 error: error.message
             });
@@ -182,8 +297,8 @@ class UsuarioController {
 
             // Verificar se o usuário logado é o dono do perfil
             if (req.usuario.usuarioId !== usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode alterar seu próprio perfil' 
+                return res.status(403).json({
+                    error: 'Você só pode alterar seu próprio perfil'
                 });
             }
 
@@ -212,7 +327,7 @@ class UsuarioController {
             // Verificar se email já está em uso por outro usuário
             if (UsuarioEmail && UsuarioEmail.trim() !== usuario.UsuarioEmail) {
                 const emailExistente = await prisma.usuario.findFirst({
-                    where: { AND: { UsuarioEmail: UsuarioEmail.trim() }}
+                    where: { AND: { UsuarioEmail: UsuarioEmail.trim() } }
                 });
                 if (emailExistente) {
                     return res.status(409).json({ error: 'E-mail já está em uso por outro usuário' });
@@ -266,8 +381,8 @@ class UsuarioController {
 
             // Verificar se o usuário logado é o dono do perfil
             if (req.usuario.usuarioId !== usuarioId) {
-                return res.status(403).json({ 
-                    error: 'Você só pode excluir seu próprio perfil' 
+                return res.status(403).json({
+                    error: 'Você só pode excluir seu próprio perfil'
                 });
             }
 
