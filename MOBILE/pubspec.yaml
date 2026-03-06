@@ -1,0 +1,27 @@
+name: flutter_cortes_top
+description: "Projeto APP para agendamento de barbearias."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.1.0  # Para fazer requisições HTTP
+  provider: ^6.1.1  # Para gerenciamento de estado
+  mask_text_input_formatter: ^2.9.0  # Para máscara de telefone
+  shared_preferences: ^2.2.2 # Para armazenar dados localmente
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
