@@ -25,7 +25,7 @@ router.get('/prestadores/ultimos', authMiddleware, usuarioController.listarUltim
 router.get('/prestadores/pesquisa', authMiddleware, usuarioController.pesquisarPrestadores);
 
 // Rotas protegidas (precisam de autenticação)
-router.put('/:id', authMiddleware, usuarioController.atualizarUsuario);
+router.put('/:id', authMiddleware, usuarioController.atualizarPerfil);
 router.delete('/:usuarioId', authMiddleware, usuarioController.excluirUsuario);
 
 module.exports = router;

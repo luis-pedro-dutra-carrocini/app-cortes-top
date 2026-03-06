@@ -49,8 +49,8 @@ class ServicoPrecoController {
                 return res.status(404).json({ error: 'Serviço não encontrado' });
             }
 
-            // Verificar se o serviço pertence ao prestador logado
-            if (servico.PrestadorId !== req.usuario.usuarioId) {
+            // Verificar se o serviço pertence ao prestador logado e não tem relação com estabelecimento
+            if (servico.PrestadorId !== req.usuario.usuarioId && servico.ServicoEstabelecimentoId === null) {
                 return res.status(403).json({ 
                     error: 'Você só pode adicionar preços aos seus próprios serviços' 
                 });

@@ -168,10 +168,11 @@ class ServicoController {
                 });
             }
 
-            // Buscar serviços do prestador
+            // Buscar serviços do prestador que não tem relação com estabelecimentos
             const servicos = await prisma.servico.findMany({
                 where: {
-                    PrestadorId: parseInt(prestadorId)
+                    PrestadorId: parseInt(prestadorId),
+                    ServicoEstabelecimentoId: null // Garante que são serviços do prestador, não vinculados a estabelecimentos
                 },
                 include: {
                     prestador: {
@@ -315,8 +316,8 @@ class ServicoController {
                 return res.status(404).json({ error: 'Serviço não encontrado' });
             }
 
-            // Verificar se o serviço pertence ao prestador logado
-            if (servico.PrestadorId !== req.usuario.usuarioId) {
+            // Verificar se o serviço pertence ao prestador logado e não tem relação com estabelecimento
+            if (servico.PrestadorId !== req.usuario.usuarioId && servico.ServicoEstabelecimentoId === null) {
                 return res.status(403).json({
                     error: 'Você só pode atualizar seus próprios serviços'
                 });
@@ -398,8 +399,8 @@ class ServicoController {
                 return res.status(404).json({ error: 'Serviço não encontrado' });
             }
 
-            // Verificar se o serviço pertence ao prestador logado
-            if (servico.PrestadorId !== req.usuario.usuarioId) {
+            // Verificar se o serviço pertence ao prestador logado e não tem relação com estabelecimento
+            if (servico.PrestadorId !== req.usuario.usuarioId && servico.ServicoEstabelecimentoId === null) {
                 return res.status(403).json({
                     error: 'Você só pode excluir seus próprios serviços'
                 });
@@ -474,8 +475,8 @@ class ServicoController {
                 return res.status(404).json({ error: 'Serviço não encontrado' });
             }
 
-            // Verificar se o serviço pertence ao prestador logado
-            if (servico.PrestadorId !== req.usuario.usuarioId) {
+            // Verificar se o serviço pertence ao prestador logado e não tem relação com estabelecimento
+            if (servico.PrestadorId !== req.usuario.usuarioId && servico.ServicoEstabelecimentoId === null) {
                 return res.status(403).json({
                     error: 'Você só pode alterar o status dos seus próprios serviços'
                 });

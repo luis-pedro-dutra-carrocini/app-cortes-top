@@ -122,10 +122,11 @@ class DisponibilidadeController {
         }
     }
 
-    // Listar disponibilidades de um prestador (somente o pretador dono das disponibilidades)
+    // Listar disponibilidades de um prestador por período (somente o prestador dono das disponibilidades)
     async listarDisponibilidadesPorPrestador(req, res) {
         try {
             const { prestadorId } = req.params;
+            const { dataInicio, dataFim } = req.query; // Receber parâmetros de período
 
             if (!prestadorId || isNaN(parseInt(prestadorId))) {
                 return res.status(400).json({ error: 'ID de prestador inválido' });
@@ -146,21 +147,39 @@ class DisponibilidadeController {
                 });
             }
 
-            if (prestador.UsuarioTipo !== 'PRESTADOR') {
-                return res.status(400).json({ error: 'O usuário informado não é um prestador' });
+            // Construir filtro de data
+            const filtroData = {};
+
+            if (dataInicio && dataFim) {
+                // Validar formato das datas
+                const inicio = new Date(dataInicio);
+                const fim = new Date(dataFim);
+
+                if (isNaN(inicio) || isNaN(fim)) {
+                    return res.status(400).json({ error: 'Formato de data inválido' });
+                }
+
+                // Ajustar para início e fim do dia
+                inicio.setHours(0, 0, 0, 0);
+                fim.setHours(23, 59, 59, 999);
+
+                filtroData.DisponibilidadeData = {
+                    gte: inicio,
+                    lte: fim
+                };
             }
 
-            // Buscar disponibilidades do prestador
+            // Buscar disponibilidades do prestador com filtro de período
             const disponibilidades = await prisma.disponibilidade.findMany({
                 where: {
-                    PrestadorId: parseInt(prestadorId)
+                    PrestadorId: parseInt(prestadorId),
+                    ...filtroData // Aplicar filtro de data se existir
                 },
                 include: {
                     prestador: {
                         select: {
                             UsuarioId: true,
                             UsuarioNome: true,
-                            //UsuarioEmail: true,
                             UsuarioTelefone: true
                         }
                     }
@@ -177,7 +196,6 @@ class DisponibilidadeController {
 
             const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
-            // CORREÇÃO 1: Usar let ou var em vez de const
             let disponibilidadesFormatadas = disponibilidades.map(disp => ({
                 ...disp,
                 dataFormatada: formatarData(disp.DisponibilidadeData),
@@ -201,14 +219,17 @@ class DisponibilidadeController {
                 return acc;
             }, {});
 
-            // CORREÇÃO 2: Manter compatibilidade com frontend - retornar AMBOS os nomes
             res.status(200).json({
                 data: disponibilidadesFormatadas,
                 agrupadoPorData: Object.values(disponibilidadesPorData),
-                agrupadoPorDia: Object.values(disponibilidadesPorData), // <- MESMO VALOR para compatibilidade
+                agrupadoPorDia: Object.values(disponibilidadesPorData), // Para compatibilidade
                 prestador: {
                     id: prestador.UsuarioId,
                     nome: prestador.UsuarioNome
+                },
+                periodo: { // Informar o período consultado
+                    dataInicio: dataInicio || null,
+                    dataFim: dataFim || null
                 }
             });
 

@@ -260,7 +260,7 @@ class AgendamentoController {
             const agendamentos = await prisma.agendamento.findMany({
                 where: {
                     ClienteId: req.usuario.usuarioId,
-                    AgendamentoStatus: 'PENDENTE' // Exibir apenas agendamentos futuros ou pendentes
+                    AgendamentoStatus: { in: ['PENDENTE', 'CONFIRMADO'] }// Exibir apenas agendamentos confirmados ou pendentes
                 },
                 include: {
                     prestador: {
@@ -314,7 +314,7 @@ class AgendamentoController {
         }
     }
 
-    // Listar agendamentos do prestador logado (apenas PRESTADOR)
+    // Listar agendamentos do prestador logado (apenas PRESTADOR) com filtro de data
     async listarMeusAgendamentosPrestador(req, res) {
         try {
             // Verificar se é prestador
@@ -324,10 +324,32 @@ class AgendamentoController {
                 });
             }
 
+            const { dataInicio, dataFim } = req.query;
+
+            // Construir where dinâmico
+            const where = {
+                PrestadorId: req.usuario.usuarioId
+            };
+
+            // Aplicar filtro de data se fornecido
+            if (dataInicio || dataFim) {
+                where.AgendamentoDtServico = {};
+
+                if (dataInicio) {
+                    const inicio = new Date(dataInicio);
+                    inicio.setHours(0, 0, 0, 0);
+                    where.AgendamentoDtServico.gte = inicio;
+                }
+
+                if (dataFim) {
+                    const fim = new Date(dataFim);
+                    fim.setHours(23, 59, 59, 999);
+                    where.AgendamentoDtServico.lte = fim;
+                }
+            }
+
             const agendamentos = await prisma.agendamento.findMany({
-                where: {
-                    PrestadorId: req.usuario.usuarioId
-                },
+                where: where,
                 include: {
                     cliente: {
                         select: {
@@ -369,7 +391,8 @@ class AgendamentoController {
 
             res.status(200).json({
                 data: agendamentosFormatados,
-                total: agendamentos.length
+                total: agendamentos.length,
+                periodo: dataInicio || dataFim ? { dataInicio, dataFim } : null
             });
 
         } catch (error) {
@@ -466,11 +489,11 @@ class AgendamentoController {
             const agendamentoId = parseInt(req.params.id);
             const { AgendamentoStatus } = req.body;
 
-            const statusValidos = ['PENDENTE', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO'];
+            const statusValidos = ['PENDENTE', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO'];
 
             if (!AgendamentoStatus || !statusValidos.includes(AgendamentoStatus)) {
                 return res.status(400).json({
-                    error: 'Status inválido. Use: PENDENTE, CONFIRMADO, EM_ANDAMENTO, CONCLUIDO, CANCELADO'
+                    error: 'Status inválido. Use: PENDENTE, CONFIRMADO, EM_ANDAMENTO, CONCLUIDO'
                 });
             }
 
@@ -493,11 +516,10 @@ class AgendamentoController {
 
             // Regras de transição de status
             const transicoesValidas = {
-                'PENDENTE': ['CONFIRMADO', 'CANCELADO'],
-                'CONFIRMADO': ['EM_ANDAMENTO', 'CANCELADO'],
+                'PENDENTE': ['CONFIRMADO'],
+                'CONFIRMADO': ['EM_ANDAMENTO', 'PENDENTE'], // Permitir voltar para PENDENTE se necessário
                 'EM_ANDAMENTO': ['CONCLUIDO'],
-                'CONCLUIDO': [],
-                'CANCELADO': []
+                'CONCLUIDO': []
             };
 
             if (!transicoesValidas[agendamento.AgendamentoStatus].includes(AgendamentoStatus)) {
@@ -866,10 +888,11 @@ class AgendamentoController {
         }
     }
 
-    // Cancelar agendamento (apenas cliente ou prestador)
+    // Cancelar/Recusar agendamento (apenas cliente ou prestador)
     async cancelarAgendamento(req, res) {
         try {
             const agendamentoId = parseInt(req.params.agendamentoId);
+            const { motivo } = req.body; // Receber motivo do cancelamento/recusa
 
             // Buscar agendamento
             const agendamento = await prisma.agendamento.findUnique({
@@ -888,6 +911,16 @@ class AgendamentoController {
                 });
             }
 
+            let tipoUsuario;
+            let tipoCancelamento;
+            if (agendamento.ClienteId === req.usuario.usuarioId) {
+                tipoUsuario = 'CLIENTE';
+                tipoCancelamento = 'CANCELADO';
+            } else {
+                tipoUsuario = 'PRESTADOR';
+                tipoCancelamento = 'RECUSADO';
+            }
+
             // Verificar se pode cancelar
             if (agendamento.AgendamentoStatus === 'CONCLUIDO') {
                 return res.status(400).json({
@@ -895,16 +928,40 @@ class AgendamentoController {
                 });
             }
 
-            if (agendamento.AgendamentoStatus === 'CANCELADO') {
+            if (agendamento.AgendamentoStatus === 'EM_ANDAMENTO') {
+                return res.status(400).json({
+                    error: 'Não é possível cancelar um agendamento em andamento'
+                });
+            }
+
+            if (agendamento.AgendamentoStatus === 'CANCELADO' || agendamento.AgendamentoStatus === 'RECUSADO') {
                 return res.status(400).json({
                     error: 'Agendamento já está cancelado'
                 });
             }
 
-            // Cancelar agendamento
+            if (agendamento.AgendamentoStatus === 'CONFIRMADO' && tipoUsuario === 'PRESTADOR') {
+                return res.status(400).json({
+                    error: 'Agendamento confirmado não pode ser cancelado pelo prestador.'
+                });
+            }
+
+            // Validar motivo para recusa/cancelamento
+            if (!motivo || motivo.trim() === '') {
+                return res.status(400).json({
+                    error: tipoCancelamento === 'RECUSADO'
+                        ? 'É necessário informar o motivo da recusa'
+                        : 'É necessário informar o motivo do cancelamento'
+                });
+            }
+
+            // Cancelar agendamento com motivo
             const agendamentoCancelado = await prisma.agendamento.update({
                 where: { AgendamentoId: agendamentoId },
-                data: { AgendamentoStatus: 'CANCELADO' },
+                data: {
+                    AgendamentoStatus: tipoCancelamento,
+                    AgendamentoDescricaoTrabalho: motivo.trim() // Salvar motivo no campo de descrição
+                },
                 include: {
                     prestador: {
                         select: {
@@ -928,7 +985,9 @@ class AgendamentoController {
             });
 
             res.status(200).json({
-                message: 'Agendamento cancelado com sucesso',
+                message: tipoCancelamento === 'RECUSADO'
+                    ? 'Agendamento recusado com sucesso'
+                    : 'Agendamento cancelado com sucesso',
                 data: {
                     ...agendamentoCancelado,
                     AgendamentoValorTotal: parseFloat(agendamentoCancelado.AgendamentoValorTotal)
