@@ -85,7 +85,11 @@ class ServicoController {
             const servicos = await prisma.servico.findMany({
                 where: {
                     PrestadorId: parseInt(prestadorId),
-                    ServicoAtivo: true
+                    ServicoAtivo: true,
+                    ServicoEstabelecimentoId: null,
+                    precos: {
+                        some: {} // Garante que existe pelo menos um preço
+                    }
                 },
                 include: {
                     prestador: {

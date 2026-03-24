@@ -1,4 +1,4 @@
-// src/routes/disponibilidadeRoutes.js
+// src/routes/disponibilidadeRouter.js
 const express = require('express');
 const disponibilidadeController = require('../controllers/disponibilidadeController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -7,6 +7,10 @@ const router = express.Router();
 
 // Todas as rotas de disponibilidade exigem autenticação (usuário logado)
 router.use(authMiddleware);
+
+router.get('/prestador/:prestadorId/estabelecimento/:estabelecimentoId', disponibilidadeController.listarDisponibilidadesPorEstabelecimentoPorPrestador);
+
+router.get('/estabelecimento/:estabelecimentoId', disponibilidadeController.listarDisponibilidadesPorEstabelecimento);
 
 // Rotas de consulta (qualquer usuário logado pode acessar)
 router.get('/prestador/:prestadorId/data/:data', disponibilidadeController.listarDisponibilidadesPorPrestadorData);

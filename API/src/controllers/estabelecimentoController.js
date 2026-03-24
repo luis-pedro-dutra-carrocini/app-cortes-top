@@ -159,8 +159,8 @@ class EstabelecimentoController {
                     });
 
                     // Buscar quantidade de usuários vinculados
-                    const totalUsuarios = await prisma.usuarioEsatablecimento.count({
-                        where: { EstabelecimentoId: est.EstabelecimentoId }
+                    const totalUsuarios = await prisma.usuarioEstabelecimento.count({
+                        where: { EstabelecimentoId: est.EstabelecimentoId, UsuarioEstabelecimentoStatus: 'ATIVO' }
                     });
 
                     return {
@@ -222,7 +222,7 @@ class EstabelecimentoController {
             });
 
             // Buscar usuários vinculados
-            const usuariosVinculados = await prisma.usuarioEsatablecimento.findMany({
+            const usuariosVinculados = await prisma.usuarioEstabelecimento.findMany({
                 where: {
                     EstabelecimentoId: parseInt(estabelecimentoId),
                     UsuarioEstabelecimentoStatus: {
@@ -499,7 +499,7 @@ class EstabelecimentoController {
             }
 
             // Verificar se já está vinculado
-            const vinculoExistente = await prisma.usuarioEsatablecimento.findFirst({
+            const vinculoExistente = await prisma.usuarioEstabelecimento.findFirst({
                 where: {
                     UsuarioId: parseInt(usuarioId),
                     EstabelecimentoId: parseInt(estabelecimentoId)
@@ -511,7 +511,7 @@ class EstabelecimentoController {
             }
 
             // Criar vínculo
-            const vinculo = await prisma.usuarioEsatablecimento.create({
+            const vinculo = await prisma.usuarioEstabelecimento.create({
                 data: {
                     UsuarioId: parseInt(usuarioId),
                     EstabelecimentoId: parseInt(estabelecimentoId)
@@ -572,7 +572,7 @@ class EstabelecimentoController {
             }
 
             // Verificar se o vínculo existe
-            const vinculo = await prisma.usuarioEsatablecimento.findFirst({
+            const vinculo = await prisma.usuarioEstabelecimento.findFirst({
                 where: {
                     UsuarioId: parseInt(usuarioId),
                     EstabelecimentoId: parseInt(estabelecimentoId)
@@ -601,7 +601,7 @@ class EstabelecimentoController {
             }
 
             // Remover vínculo
-            await prisma.usuarioEsatablecimento.delete({
+            await prisma.usuarioEstabelecimento.delete({
                 where: {
                     UsuarioEstabelecimentoId: vinculo.UsuarioEstabelecimentoId
                 }
@@ -643,7 +643,7 @@ class EstabelecimentoController {
             }
 
             // Buscar usuários vinculados
-            const vinculos = await prisma.usuarioEsatablecimento.findMany({
+            const vinculos = await prisma.usuarioEstabelecimento.findMany({
                 where: {
                     EstabelecimentoId: parseInt(estabelecimentoId)
                 },
@@ -706,7 +706,7 @@ class EstabelecimentoController {
             }
 
             // Buscar vínculos (excluindo EXCLUIDO)
-            const vinculos = await prisma.usuarioEsatablecimento.findMany({
+            const vinculos = await prisma.usuarioEstabelecimento.findMany({
                 where: {
                     EstabelecimentoId: parseInt(estabelecimentoId),
                     UsuarioEstabelecimentoStatus: {
@@ -742,8 +742,8 @@ class EstabelecimentoController {
                 }
             }));
 
-            console.log('Vínculos brutos do banco:', JSON.stringify(vinculos, null, 2));
-            console.log('Vínculos formatados:', JSON.stringify(vinculosFormatados, null, 2));
+            //console.log('Vínculos brutos do banco:', JSON.stringify(vinculos, null, 2));
+            //console.log('Vínculos formatados:', JSON.stringify(vinculosFormatados, null, 2));
 
 
             res.status(200).json({
@@ -806,7 +806,7 @@ class EstabelecimentoController {
             }
 
             // Verificar se já existe vínculo não excluído
-            const vinculoExistente = await prisma.usuarioEsatablecimento.findFirst({
+            const vinculoExistente = await prisma.usuarioEstabelecimento.findFirst({
                 where: {
                     UsuarioId: parseInt(usuarioId),
                     EstabelecimentoId: parseInt(estabelecimentoId),
@@ -824,7 +824,7 @@ class EstabelecimentoController {
             }
 
             // Criar solicitação
-            const vinculo = await prisma.usuarioEsatablecimento.create({
+            const vinculo = await prisma.usuarioEstabelecimento.create({
                 data: {
                     UsuarioId: parseInt(usuarioId),
                     EstabelecimentoId: parseInt(estabelecimentoId),
@@ -877,7 +877,7 @@ class EstabelecimentoController {
             }
 
             // Buscar vínculo
-            const vinculo = await prisma.usuarioEsatablecimento.findUnique({
+            const vinculo = await prisma.usuarioEstabelecimento.findUnique({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) }
             });
 
@@ -897,7 +897,7 @@ class EstabelecimentoController {
             }
 
             // Verificar se o status permite aceitação
-            if (vinculo.UsuarioEstabelecimentoStatus !== 'SOLICITADOEST') {
+            if (vinculo.UsuarioEstabelecimentoStatus !== 'SOLICITADOEST' && vinculo.UsuarioEstabelecimentoStatus !== 'RECUSADOPRE') {
                 return res.status(400).json({
                     success: false,
                     error: 'Este vínculo não pode ser aceito no status atual'
@@ -905,7 +905,7 @@ class EstabelecimentoController {
             }
 
             // Aceitar vínculo
-            const vinculoAtualizado = await prisma.usuarioEsatablecimento.update({
+            const vinculoAtualizado = await prisma.usuarioEstabelecimento.update({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
                 data: { UsuarioEstabelecimentoStatus: 'ATIVO' }
             });
@@ -940,7 +940,7 @@ class EstabelecimentoController {
             }
 
             // Buscar vínculo
-            const vinculo = await prisma.usuarioEsatablecimento.findUnique({
+            const vinculo = await prisma.usuarioEstabelecimento.findUnique({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) }
             });
 
@@ -968,9 +968,9 @@ class EstabelecimentoController {
             }
 
             // Excluir vínculo (soft delete)
-            await prisma.usuarioEsatablecimento.update({
+            await prisma.usuarioEstabelecimento.update({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
-                data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO' }
+                data: { UsuarioEstabelecimentoStatus: 'RECUSADOPRE' }
             });
 
             res.status(200).json({
@@ -1002,7 +1002,7 @@ class EstabelecimentoController {
             }
 
             // Buscar vínculo com estabelecimento
-            const vinculo = await prisma.usuarioEsatablecimento.findUnique({
+            const vinculo = await prisma.usuarioEstabelecimento.findUnique({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
                 include: {
                     estabelecimento: true
@@ -1025,7 +1025,7 @@ class EstabelecimentoController {
             }
 
             // Desativar vínculo
-            await prisma.usuarioEsatablecimento.update({
+            await prisma.usuarioEstabelecimento.update({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
                 data: { UsuarioEstabelecimentoStatus: 'INATIVO' }
             });
@@ -1044,6 +1044,63 @@ class EstabelecimentoController {
         }
     }
 
+    // Desativar vínculo (estabelecimento desativa)
+    async reativarVinculo(req, res) {
+        try {
+            const { vinculoId } = req.params;
+            const empresaId = req.usuario.usuarioId;
+
+            // Verificar se o usuário é EMPRESA
+            if (req.usuario.usuarioTipo !== 'EMPRESA') {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Apenas empresas podem desativar vínculos'
+                });
+            }
+
+            // Buscar vínculo com estabelecimento
+            const vinculo = await prisma.usuarioEstabelecimento.findUnique({
+                where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
+                include: {
+                    estabelecimento: true
+                }
+            });
+
+            if (!vinculo) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Vínculo não encontrado'
+                });
+            }
+
+            // Verificar se o estabelecimento pertence à empresa
+            if (vinculo.estabelecimento.EmpresaId !== empresaId) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Você só pode reativar vínculos dos seus estabelecimentos'
+                });
+            }
+
+            // Desativar vínculo
+            await prisma.usuarioEstabelecimento.update({
+                where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
+                data: { UsuarioEstabelecimentoStatus: 'ATIVO' }
+            });
+
+            res.status(200).json({
+                success: true,
+                message: 'Vínculo reativado com sucesso'
+            });
+
+        } catch (error) {
+            console.error('Erro ao reativar vínculo:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
     // Excluir vínculo (soft delete - ambos os lados podem excluir)
     async excluirVinculo(req, res) {
         try {
@@ -1052,7 +1109,7 @@ class EstabelecimentoController {
             const tipoUsuario = req.usuario.usuarioTipo;
 
             // Buscar vínculo
-            const vinculo = await prisma.usuarioEsatablecimento.findUnique({
+            const vinculo = await prisma.usuarioEstabelecimento.findUnique({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
                 include: {
                     estabelecimento: true
@@ -1090,8 +1147,34 @@ class EstabelecimentoController {
                 });
             }
 
+            const vinculoEst = await prisma.usuarioEstabelecimento.findFirst({
+                where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
+                select: {
+                    UsuarioId: true,
+                    EstabelecimentoId: true
+                }
+            });
+
+            console.log('vinculoEst = ', vinculoEst)
+
+            // Obter os serviços do estabelecimento e desvincular cada um deles
+            if (vinculoEst) {
+                const sevicosEstabelecimentos = await prisma.servicoEstabelecimento.findMany({
+                    where: { EstabelecimentoId: vinculoEst.EstabelecimentoId }
+                });
+
+                console.log('sevicosestabelecimentos = ', sevicosEstabelecimentos)
+
+                for (const servicoEstabelecimento of sevicosEstabelecimentos) {
+                    await prisma.servico.updateMany({
+                        where: { PrestadorId: vinculoEst.UsuarioId, ServicoEstabelecimentoId: servicoEstabelecimento.ServicoEstabelecimentoId },
+                        data: { ServicoAtivo: false }
+                    });
+                }
+            }
+
             // Soft delete
-            await prisma.usuarioEsatablecimento.update({
+            await prisma.usuarioEstabelecimento.update({
                 where: { UsuarioEstabelecimentoId: parseInt(vinculoId) },
                 data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO' }
             });
@@ -1120,7 +1203,7 @@ class EstabelecimentoController {
             // Verificar permissões...
 
             // Buscar IDs dos usuários já vinculados
-            const usuariosVinculados = await prisma.usuarioEsatablecimento.findMany({
+            const usuariosVinculados = await prisma.usuarioEstabelecimento.findMany({
                 where: {
                     EstabelecimentoId: parseInt(estabelecimentoId),
                     UsuarioEstabelecimentoStatus: {
@@ -1183,6 +1266,46 @@ class EstabelecimentoController {
             res.status(500).json({ success: false, error: error.message });
         }
     }
+
+    async listarVinculosPrestador(req, res) {
+        try {
+            const prestadorId = req.usuario.usuarioId;
+
+            const vinculos = await prisma.usuarioEstabelecimento.findMany({
+                where: {
+                    UsuarioId: prestadorId,
+                    UsuarioEstabelecimentoStatus: {
+                        not: 'EXCLUIDO'
+                    }
+                },
+                include: {
+                    estabelecimento: {
+                        include: {
+                            empresa: {
+                                select: {
+                                    EmpresaNome: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: {
+                    UsuarioEstabelecimentoDtCriacao: 'desc'
+                }
+            });
+
+            console.log('vinculos = ', vinculos)
+
+            res.status(200).json({
+                success: true,
+                data: vinculos
+            });
+        } catch (error) {
+            console.error('Erro ao listar vínculos do prestador:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
 }
 
 module.exports = new EstabelecimentoController();

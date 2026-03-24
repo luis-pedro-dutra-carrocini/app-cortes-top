@@ -23,17 +23,24 @@ const disponibilidadeRouter = require('./routes/disponibilidadeRouter');
 const servicoPrecoRouter = require('./routes/servicoPrecoRouter');
 const servicoRouter = require('./routes/servicoRouter');
 const usuarioRouter = require('./routes/usuarioRouter');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const estabelecimentoRoutes = require('./routes/estabelecimentoRoutes');
+const dashboardRouter = require('./routes/dashboardRouter');
+const estabelecimentoRouter = require('./routes/estabelecimentoRouter');
+const servicoEstabelecimentoRouter = require('./routes/servicoEstabelecimentoRouter');
+const empresaRouter = require('./routes/empresaRouter');
+const pesquisaRoutes = require('./routes/pesquisaRoutes');
+const dashboardEmpresaRoutes = require('./routes/dashboardEmpresaRouter');
 
 app.use('/api/agendamento', agendamentoRouter);
 app.use('/api/disponibilidade', disponibilidadeRouter);
 app.use('/api/servicoPreco', servicoPrecoRouter);
 app.use('/api/servico', servicoRouter);
 app.use('/api/usuario', usuarioRouter);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/estabelecimento', estabelecimentoRoutes);
-
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/estabelecimento', estabelecimentoRouter);
+app.use('/api/servicoEstabelecimento', servicoEstabelecimentoRouter);
+app.use('/api/empresa', empresaRouter);
+app.use('/api/pesquisa', pesquisaRoutes);
+app.use('/api/dashboard-empresa', dashboardEmpresaRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

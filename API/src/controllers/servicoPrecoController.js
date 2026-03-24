@@ -3,43 +3,29 @@ const prisma = require('../prisma.js');
 
 class ServicoPrecoController {
 
-    // Adicionar novo preço para um serviço (apenas PRESTADOR dono do serviço)
+    // Adicionar novo preço para um serviço (prestador dono OU empresa dona do estabelecimento)
     async adicionarPreco(req, res) {
         try {
             const { servicoId } = req.params;
             const { ServicoValor } = req.body;
-
-            // Verificar se o usuário é PRESTADOR
-            if (req.usuario.usuarioTipo !== 'PRESTADOR') {
-                return res.status(403).json({ 
-                    error: 'Apenas prestadores podem adicionar preços' 
-                });
-            }
 
             // Validações
             if (!servicoId) {
                 return res.status(400).json({ error: 'ID do serviço é obrigatório' });
             }
 
-            if (!ServicoValor && ServicoValor !== 0) {
-                return res.status(400).json({ error: 'Valor do serviço é obrigatório' });
+            if (!ServicoValor || ServicoValor <= 0) {
+                return res.status(400).json({ error: 'Valor do serviço é obrigatório e deve ser maior que zero' });
             }
 
-            if (ServicoValor <= 0) {
-                return res.status(400).json({ error: 'Valor do serviço deve ser maior que zero' });
-            }
-
-            // Buscar o serviço para verificar se existe e se pertence ao prestador
+            // Buscar o serviço com suas relações
             const servico = await prisma.servico.findUnique({
-                where: { 
-                    ServicoId: parseInt(servicoId) 
-                },
+                where: { ServicoId: parseInt(servicoId) },
                 include: {
-                    prestador: {
-                        select: {
-                            UsuarioId: true,
-                            UsuarioNome: true,
-                            UsuarioTipo: true
+                    prestador: true,
+                    servicoEstabelecimento: {
+                        include: {
+                            estabelecimento: true
                         }
                     }
                 }
@@ -49,17 +35,15 @@ class ServicoPrecoController {
                 return res.status(404).json({ error: 'Serviço não encontrado' });
             }
 
-            // Verificar se o serviço pertence ao prestador logado e não tem relação com estabelecimento
-            if (servico.PrestadorId !== req.usuario.usuarioId && servico.ServicoEstabelecimentoId === null) {
-                return res.status(403).json({ 
-                    error: 'Você só pode adicionar preços aos seus próprios serviços' 
-                });
-            }
+            // Verificar permissão:
+            // - Se for serviço de prestador (sem estabelecimento): apenas o prestador dono
+            // - Se for serviço de estabelecimento: prestador dono OU empresa dona do estabelecimento
+            const isPrestadorDono = servico.PrestadorId === req.usuario.usuarioId;
+            const isEmpresaDona = servico.servicoEstabelecimento?.estabelecimento?.EmpresaId === req.usuario.usuarioId;
 
-            // Verificar se o serviço está ativo
-            if (!servico.ServicoAtivo) {
-                return res.status(400).json({ 
-                    error: 'Não é possível adicionar preço a um serviço inativo' 
+            if (!isPrestadorDono && !isEmpresaDona) {
+                return res.status(403).json({
+                    error: 'Você não tem permissão para adicionar preço a este serviço'
                 });
             }
 
@@ -67,26 +51,20 @@ class ServicoPrecoController {
             const novoPreco = await prisma.servicoPreco.create({
                 data: {
                     ServicoId: parseInt(servicoId),
+                    EstabelecimentoId: servico.servicoEstabelecimento?.estabelecimento?.EstabelecimentoId || null,
                     ServicoValor: ServicoValor
                 },
                 include: {
                     servico: {
                         select: {
                             ServicoId: true,
-                            ServicoNome: true,
-                            ServicoTempoMedio: true,
-                            prestador: {
-                                select: {
-                                    UsuarioId: true,
-                                    UsuarioNome: true
-                                }
-                            }
+                            ServicoNome: true
                         }
                     }
                 }
             });
 
-            // Formatar resposta (converter Decimal para número)
+            // Formatar resposta
             const respostaFormatada = {
                 ...novoPreco,
                 ServicoValor: parseFloat(novoPreco.ServicoValor)
@@ -116,8 +94,8 @@ class ServicoPrecoController {
 
             // Verificar se o serviço existe
             const servico = await prisma.servico.findUnique({
-                where: { 
-                    ServicoId: parseInt(servicoId) 
+                where: {
+                    ServicoId: parseInt(servicoId)
                 },
                 include: {
                     prestador: {
@@ -161,7 +139,7 @@ class ServicoPrecoController {
             const estatisticas = {
                 totalPrecos: precos.length,
                 precoAtual: precos.length > 0 ? parseFloat(precos[0].ServicoValor) : null,
-                precoMedio: precos.length > 0 
+                precoMedio: precos.length > 0
                     ? parseFloat((precos.reduce((acc, p) => acc + parseFloat(p.ServicoValor), 0) / precos.length).toFixed(2))
                     : null,
                 menorPreco: precos.length > 0
@@ -170,7 +148,7 @@ class ServicoPrecoController {
                 maiorPreco: precos.length > 0
                     ? parseFloat(Math.max(...precos.map(p => parseFloat(p.ServicoValor))).toFixed(2))
                     : null,
-                primeiroPreco: precos.length > 0 
+                primeiroPreco: precos.length > 0
                     ? {
                         valor: parseFloat(precos[precos.length - 1].ServicoValor),
                         data: precos[precos.length - 1].ServicoPrecoDtCriacao
@@ -328,6 +306,126 @@ class ServicoPrecoController {
             });
         }
     }
+
+    // Atualizar preço de um serviço para todos os prestadores vinculados (apenas EMPRESA dona do estabelecimento)
+    async atualizarPrecoServicoEstabelecimento(req, res) {
+        try {
+            const { servicoEstabelecimentoId } = req.params;
+            const { ServicoValor } = req.body;
+
+            // Validações
+            if (!servicoEstabelecimentoId) {
+                return res.status(400).json({ error: 'ID do serviço do estabelecimento é obrigatório' });
+            }
+
+            if (!ServicoValor || ServicoValor <= 0) {
+                return res.status(400).json({ error: 'Valor do serviço é obrigatório e deve ser maior que zero' });
+            }
+
+            // Verificar se o usuário é EMPRESA
+            if (req.usuario.usuarioTipo !== 'EMPRESA') {
+                return res.status(403).json({
+                    error: 'Apenas empresas podem atualizar preços de serviços do estabelecimento'
+                });
+            }
+
+            // Buscar o serviço do estabelecimento
+            const servicoEstabelecimento = await prisma.servicoEstabelecimento.findUnique({
+                where: { ServicoEstabelecimentoId: parseInt(servicoEstabelecimentoId) },
+                include: {
+                    estabelecimento: true
+                }
+            });
+
+            if (!servicoEstabelecimento) {
+                return res.status(404).json({ error: 'Serviço do estabelecimento não encontrado' });
+            }
+
+            // Verificar se o estabelecimento pertence à empresa logada
+            if (servicoEstabelecimento.estabelecimento.EmpresaId !== req.usuario.usuarioId) {
+                return res.status(403).json({
+                    error: 'Você só pode atualizar preços de serviços dos seus estabelecimentos'
+                });
+            }
+
+            // Buscar todos os serviços vinculados a este serviço do estabelecimento
+            const servicosVinculados = await prisma.servico.findMany({
+                where: {
+                    ServicoEstabelecimentoId: parseInt(servicoEstabelecimentoId),
+                    ServicoAtivo: true
+                },
+                select: {
+                    ServicoId: true
+                }
+            });
+
+            if (servicosVinculados.length === 0) {
+                return res.status(404).json({
+                    error: 'Não há prestadores vinculados a este serviço'
+                });
+            }
+
+            // Criar novos registros de preço para cada serviço vinculado em transação
+            const resultados = await prisma.$transaction(
+                servicosVinculados.map(servico =>
+                    prisma.servicoPreco.create({
+                        data: {
+                            ServicoId: servico.ServicoId,
+                            EstabelecimentoId: servicoEstabelecimento.estabelecimento.EstabelecimentoId,
+                            ServicoValor: ServicoValor
+                        }
+                    })
+                )
+            );
+
+            // Buscar os serviços atualizados com os novos preços
+            const servicosAtualizados = await prisma.servico.findMany({
+                where: {
+                    ServicoEstabelecimentoId: parseInt(servicoEstabelecimentoId),
+                    ServicoAtivo: true
+                },
+                include: {
+                    prestador: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true
+                        }
+                    },
+                    precos: {
+                        orderBy: {
+                            ServicoPrecoDtCriacao: 'desc'
+                        },
+                        take: 1
+                    }
+                }
+            });
+
+            // Formatar resposta
+            const respostaFormatada = servicosAtualizados.map(s => ({
+                vinculoId: s.ServicoId,
+                prestador: s.prestador,
+                precoAtual: s.precos && s.precos.length > 0 ? parseFloat(s.precos[0].ServicoValor) : null
+            }));
+
+            res.status(200).json({
+                success: true,
+                message: `Preço atualizado para ${resultados.length} prestador(es) com sucesso`,
+                data: {
+                    servicoEstabelecimentoId: parseInt(servicoEstabelecimentoId),
+                    servicoNome: servicoEstabelecimento.ServicoNome,
+                    novoPreco: parseFloat(ServicoValor),
+                    prestadoresAtualizados: respostaFormatada
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro ao atualizar preço do serviço do estabelecimento:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
 }
 
 module.exports = new ServicoPrecoController();

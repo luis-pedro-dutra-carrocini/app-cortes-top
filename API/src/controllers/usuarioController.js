@@ -1003,8 +1003,9 @@ class UsuarioController {
 
                     // 2. Excluindo os vínculos de usuários com os estabelecimentos
                     if (estabelecimentoIds.length > 0) {
-                        await prisma.usuarioEsatablecimento.deleteMany({
-                            where: { EstabelecimentoId: { in: estabelecimentoIds } }
+                        await prisma.usuarioEstabelecimento.update({
+                            where: { EstabelecimentoId: { in: estabelecimentoIds } },
+                            data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO' }
                         });
                     }
 
@@ -1117,8 +1118,9 @@ class UsuarioController {
                     });
 
                     // 4. Retirando o usuário dos estabelecimentos que ele estava vinculado
-                    await prisma.usuarioEsatablecimento.deleteMany({
-                        where: { UsuarioId: usuarioId }
+                    await prisma.usuarioEstabelecimento.update({
+                        where: { UsuarioId: usuarioId },
+                        data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO'}
                     });
 
                     // 5. Desativando os serviços dos prestadores vinculados aos estabelecimentos da empresa

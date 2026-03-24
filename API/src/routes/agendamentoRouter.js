@@ -1,4 +1,4 @@
-// src/routes/agendamentoRoutes.js
+// src/routes/agendamentoRouter.js
 const express = require('express');
 const agendamentoController = require('../controllers/agendamentoController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -10,6 +10,7 @@ router.use(authMiddleware);
 
 // Rotas específicas por tipo de usuário
 router.get('/meus-cliente', agendamentoController.listarMeusAgendamentosClientePendentes);
+router.get('/meus-agendamentos/todos', agendamentoController.listarMeusAgendamentosClienteTodos);
 router.get('/meus-prestador', agendamentoController.listarMeusAgendamentosPrestador);
 router.get('/periodo', agendamentoController.listarAgendamentosPorPeriodo);
 
@@ -23,5 +24,7 @@ router.put('/:id', agendamentoController.atualizarAgendamento);
 
 // Rota de consulta por ID (protegida - apenas envolvidos)
 router.get('/:agendamentoId', agendamentoController.buscarAgendamentoId);
+
+router.get('/cliente/ultimas-empresas', agendamentoController.buscarUltimasEmpresas);
 
 module.exports = router;

@@ -16,8 +16,11 @@ class DisponibilidadeController {
             const {
                 DisponibilidadeData,
                 DisponibilidadeHoraInicio,
-                DisponibilidadeHoraFim
+                DisponibilidadeHoraFim,
+                EstabelecimentoId //(opcional)
             } = req.body;
+
+            //console.log('EstabelecimentoId = ', EstabelecimentoId);
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
@@ -48,32 +51,60 @@ class DisponibilidadeController {
                 return res.status(400).json({ error: 'Hora de fim deve ser maior que hora de início' });
             }
 
-            // Verificar se já existe disponibilidade para este dia e horário
-            const disponibilidadeExistente = await prisma.disponibilidade.findFirst({
-                where: {
-                    PrestadorId: req.usuario.usuarioId,
-                    OR: [
-                        {
-                            AND: [
-                                { DisponibilidadeData: new Date(DisponibilidadeData) },
-                                { DisponibilidadeHoraInicio: { lte: DisponibilidadeHoraInicio } },
-                                { DisponibilidadeHoraFim: { gt: DisponibilidadeHoraInicio } }
-                            ]
-                        },
-                        {
-                            AND: [
-                                { DisponibilidadeData: new Date(DisponibilidadeData) },
-                                { DisponibilidadeHoraInicio: { lt: DisponibilidadeHoraFim } },
-                                { DisponibilidadeHoraFim: { gte: DisponibilidadeHoraFim } }
-                            ]
-                        }
-                    ]
+            // Se foi informado um estabelecimento, verificar se o prestador tem vínculo ativo
+            if (EstabelecimentoId) {
+                const vinculo = await prisma.usuarioEstabelecimento.findFirst({
+                    where: {
+                        UsuarioId: req.usuario.usuarioId,
+                        EstabelecimentoId: parseInt(EstabelecimentoId),
+                        UsuarioEstabelecimentoStatus: 'ATIVO'
+                    }
+                });
+
+                if (!vinculo) {
+                    return res.status(403).json({
+                        error: 'Você não possui vínculo ativo com este estabelecimento'
+                    });
                 }
+            }
+
+            // Verificar se já existe disponibilidade para este dia e horário
+            // Considerando tanto disponibilidades pessoais quanto do estabelecimento
+            const whereCondition = {
+                PrestadorId: req.usuario.usuarioId,
+                DisponibilidadeData: new Date(DisponibilidadeData),
+                OR: [
+                    {
+                        AND: [
+                            { DisponibilidadeHoraInicio: { lte: DisponibilidadeHoraInicio } },
+                            { DisponibilidadeHoraFim: { gt: DisponibilidadeHoraInicio } }
+                        ]
+                    },
+                    {
+                        AND: [
+                            { DisponibilidadeHoraInicio: { lt: DisponibilidadeHoraFim } },
+                            { DisponibilidadeHoraFim: { gte: DisponibilidadeHoraFim } }
+                        ]
+                    }
+                ]
+            };
+
+            // Se for disponibilidade de estabelecimento, verificar conflito apenas com disponibilidades do mesmo estabelecimento
+            // Se for disponibilidade pessoal, verificar conflito apenas com disponibilidades pessoais
+            if (EstabelecimentoId) {
+                whereCondition.EstabelecimentoId = parseInt(EstabelecimentoId);
+            } else {
+                whereCondition.EstabelecimentoId = null;
+            }
+
+            const disponibilidadeExistente = await prisma.disponibilidade.findFirst({
+                where: whereCondition
             });
 
             if (disponibilidadeExistente) {
                 return res.status(409).json({
-                    error: 'Já existe uma disponibilidade cadastrada para este dia e horário'
+                    error: 'Já existe uma disponibilidade cadastrada para este dia e horário' +
+                        (EstabelecimentoId ? ' neste estabelecimento' : '')
                 });
             }
 
@@ -86,7 +117,8 @@ class DisponibilidadeController {
                     DisponibilidadeData: new Date(DisponibilidadeData),
                     DisponibilidadeHoraInicio: DisponibilidadeHoraInicio.trim(),
                     DisponibilidadeHoraFim: DisponibilidadeHoraFim.trim(),
-                    DisponibilidadeDiaSemana: DisponibilidadeDiaSemana
+                    DisponibilidadeDiaSemana: DisponibilidadeDiaSemana,
+                    EstabelecimentoId: EstabelecimentoId ? parseInt(EstabelecimentoId) : null
                 },
                 include: {
                     prestador: {
@@ -96,7 +128,13 @@ class DisponibilidadeController {
                             UsuarioEmail: true,
                             UsuarioTelefone: true
                         }
-                    }
+                    },
+                    estabelecimento: EstabelecimentoId ? {
+                        select: {
+                            EstabelecimentoId: true,
+                            EstabelecimentoNome: true
+                        }
+                    } : false
                 }
             });
 
@@ -126,7 +164,10 @@ class DisponibilidadeController {
     async listarDisponibilidadesPorPrestador(req, res) {
         try {
             const { prestadorId } = req.params;
-            const { dataInicio, dataFim } = req.query; // Receber parâmetros de período
+            const { dataInicio, dataFim } = req.query;
+
+            //console.log('Data Início string = ', dataInicio);
+            //console.log('Data Fim string = ', dataFim);
 
             if (!prestadorId || isNaN(parseInt(prestadorId))) {
                 return res.status(400).json({ error: 'ID de prestador inválido' });
@@ -152,16 +193,19 @@ class DisponibilidadeController {
 
             if (dataInicio && dataFim) {
                 // Validar formato das datas
-                const inicio = new Date(dataInicio);
-                const fim = new Date(dataFim);
-
-                if (isNaN(inicio) || isNaN(fim)) {
-                    return res.status(400).json({ error: 'Formato de data inválido' });
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+                    return res.status(400).json({ error: 'Formato de data inválido. Use YYYY-MM-DD' });
                 }
 
-                // Ajustar para início e fim do dia
-                inicio.setHours(0, 0, 0, 0);
-                fim.setHours(23, 59, 59, 999);
+                // Criar datas no fuso local (sem conversão UTC)
+                const [anoInicio, mesInicio, diaInicio] = dataInicio.split('-').map(Number);
+                const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+
+                const inicio = new Date(anoInicio, mesInicio - 1, diaInicio, 0, 0, 0, 0);
+                const fim = new Date(anoFim, mesFim - 1, diaFim, 23, 59, 59, 999);
+
+                console.log('Data Início local = ', inicio.toString());
+                console.log('Data Fim local = ', fim.toString());
 
                 filtroData.DisponibilidadeData = {
                     gte: inicio,
@@ -173,7 +217,7 @@ class DisponibilidadeController {
             const disponibilidades = await prisma.disponibilidade.findMany({
                 where: {
                     PrestadorId: parseInt(prestadorId),
-                    ...filtroData // Aplicar filtro de data se existir
+                    ...filtroData
                 },
                 include: {
                     prestador: {
@@ -181,6 +225,11 @@ class DisponibilidadeController {
                             UsuarioId: true,
                             UsuarioNome: true,
                             UsuarioTelefone: true
+                        }
+                    },
+                    estabelecimento: {
+                        select: {
+                            EstabelecimentoNome: true
                         }
                     }
                 },
@@ -211,7 +260,7 @@ class DisponibilidadeController {
                         data: data,
                         dataFormatada: disp.dataFormatada,
                         diaSemana: disp.diaSemana,
-                        diaSemanaDescricao: disp.diaSemanaDescricao,
+                        diaSemanaDescricao: diasSemana[disp.DispSemana],
                         disponibilidades: []
                     };
                 }
@@ -219,15 +268,17 @@ class DisponibilidadeController {
                 return acc;
             }, {});
 
+            //console.log('disponibilidadesFormatadas por prestador = ', disponibilidadesFormatadas);
+
             res.status(200).json({
                 data: disponibilidadesFormatadas,
                 agrupadoPorData: Object.values(disponibilidadesPorData),
-                agrupadoPorDia: Object.values(disponibilidadesPorData), // Para compatibilidade
+                agrupadoPorDia: Object.values(disponibilidadesPorData),
                 prestador: {
                     id: prestador.UsuarioId,
                     nome: prestador.UsuarioNome
                 },
-                periodo: { // Informar o período consultado
+                periodo: {
                     dataInicio: dataInicio || null,
                     dataFim: dataFim || null
                 }
@@ -328,9 +379,12 @@ class DisponibilidadeController {
                     dataFormatada: formatarData(disp.DisponibilidadeData),
                     diaSemana: disp.DisponibilidadeData.getDay(),
                     diaSemanaDescricao: diasSemana[disp.DisponibilidadeData.getDay()],
-                    prestador: disp.prestador
+                    prestador: disp.prestador,
+                    estabelecimentoId: disp.EstabelecimentoId
                 };
             });
+
+            //console.log('disponibilidadesFormatadas por prestador data = ', disponibilidadesFormatadas);
 
             // CORREÇÃO 3: Formatar resposta para o frontend
             // O frontend espera uma lista de disponibilidades no formato do modelo
@@ -352,7 +406,6 @@ class DisponibilidadeController {
             });
         }
     }
-
 
     // Buscar disponibilidade por ID (qualquer usuário logado)
     async buscarDisponibilidadeId(req, res) {
@@ -387,10 +440,13 @@ class DisponibilidadeController {
             const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
             const respostaFormatada = {
                 ...disponibilidade,
+                estabelecimentoId: disponibilidade.EstabelecimentoId,
                 dataFormatada: formatarData(disponibilidade.DisponibilidadeData),
                 diaSemana: disponibilidade.DisponibilidadeData.getDay(),
                 diaSemanaDescricao: diasSemana[disponibilidade.DisponibilidadeData.getDay()]
             };
+
+            //console.log('respostaFormatada disponibilidade id = ', respostaFormatada);
 
             res.status(200).json({ data: respostaFormatada });
 
@@ -409,8 +465,13 @@ class DisponibilidadeController {
             const {
                 DisponibilidadeData,
                 DisponibilidadeHoraInicio,
-                DisponibilidadeHoraFim
+                DisponibilidadeHoraFim,
+                EstabelecimentoId
             } = req.body;
+
+            //console.log('-----------------------------------------------');
+            //console.log('EstabelecimentoId = ', EstabelecimentoId);
+
 
             // Verificar se o usuário é PRESTADOR
             if (req.usuario.usuarioTipo !== 'PRESTADOR') {
@@ -529,6 +590,22 @@ class DisponibilidadeController {
                 });
             }
 
+            if (EstabelecimentoId) {
+                const vinculo = await prisma.usuarioEstabelecimento.findFirst({
+                    where: {
+                        UsuarioId: req.usuario.usuarioId,
+                        EstabelecimentoId: parseInt(EstabelecimentoId),
+                        UsuarioEstabelecimentoStatus: 'ATIVO'
+                    }
+                });
+
+                if (!vinculo) {
+                    return res.status(403).json({
+                        error: 'Você não possui vínculo ativo com este estabelecimento'
+                    });
+                }
+            }
+
             // Atualizar disponibilidade
             const disponibilidadeAtualizada = await prisma.disponibilidade.update({
                 where: {
@@ -537,7 +614,8 @@ class DisponibilidadeController {
                 data: {
                     DisponibilidadeData: dataFinal,
                     DisponibilidadeHoraInicio: horaInicioFinal,
-                    DisponibilidadeHoraFim: horaFimFinal
+                    DisponibilidadeHoraFim: horaFimFinal,
+                    EstabelecimentoId: EstabelecimentoId ? parseInt(EstabelecimentoId) : null
                 },
                 include: {
                     prestador: {
@@ -724,6 +802,8 @@ class DisponibilidadeController {
                 return acc;
             }, {});
 
+            //console.log('disponibilidadesFormatadas por data = ', disponibilidadesFormatadas);
+
             res.status(200).json({
                 data: disponibilidadesFormatadas,
                 agrupadoPorPrestador: Object.values(disponibilidadesPorPrestador),
@@ -742,6 +822,172 @@ class DisponibilidadeController {
             });
         }
     }
+
+    // Listar disponibilidades de um prestador para um estabelecimento
+    async listarDisponibilidadesPorEstabelecimentoPorPrestador(req, res) {
+        try {
+            const { prestadorId, estabelecimentoId } = req.params;
+            const { data } = req.query;
+
+            //console.log('data = ', data);
+
+            if (!data) {
+                return res.status(400).json({ error: 'Data é obrigatória' });
+            }
+
+            // Validar formato das datas
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+                return res.status(400).json({ error: 'Formato de data inválido. Use YYYY-MM-DD' });
+            }
+
+            // Criar datas no fuso local (sem conversão UTC)
+            const [ano, mes, dia] = data.split('-').map(Number);
+
+            // Criar data no início do dia (00:00:00)
+            const dataInicio = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+
+            // Criar data no fim do dia (23:59:59)
+            const dataFim = new Date(ano, mes - 1, dia, 23, 59, 59, 999);
+
+            //console.log('dataInicio = ', dataInicio);
+            //console.log('dataFim = ', dataFim);
+
+            const disponibilidades = await prisma.disponibilidade.findMany({
+                where: {
+                    PrestadorId: parseInt(prestadorId),
+                    EstabelecimentoId: parseInt(estabelecimentoId),
+                    DisponibilidadeData: {
+                        gte: dataInicio,
+                        lte: dataFim
+                    },
+                    DisponibilidadeStatus: true
+                },
+                orderBy: {
+                    DisponibilidadeHoraInicio: 'asc'
+                }
+            });
+
+            const disponibilidadesFormatadas = disponibilidades.map(disp => ({
+                id: disp.DisponibilidadeId,
+                horaInicio: disp.DisponibilidadeHoraInicio,
+                horaFim: disp.DisponibilidadeHoraFim,
+                data: disp.DisponibilidadeData,
+                status: disp.DisponibilidadeStatus,
+                estabelecimentoId: disp.EstabelecimentoId,
+            }));
+
+            //console.log('disponibilidadesFormatadas por estabelecimento = ', disponibilidadesFormatadas);
+
+            res.status(200).json({
+                success: true,
+                data: disponibilidadesFormatadas
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar disponibilidades por estabelecimento de um prestador:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Listar disponibilidades para um estabelecimento
+    async listarDisponibilidadesPorEstabelecimento(req, res) {
+        try {
+            const { estabelecimentoId } = req.params;
+            const { dataInicio, dataFim } = req.query;
+
+            // Construir filtro de data
+            const filtroData = {};
+
+            if (dataInicio && dataFim) {
+                // Validar formato das datas
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+                    return res.status(400).json({ error: 'Formato de data inválido. Use YYYY-MM-DD' });
+                }
+
+                // Criar datas no fuso local
+                const [anoInicio, mesInicio, diaInicio] = dataInicio.split('-').map(Number);
+                const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+
+                const inicio = new Date(anoInicio, mesInicio - 1, diaInicio, 0, 0, 0, 0);
+                const fim = new Date(anoFim, mesFim - 1, diaFim, 23, 59, 59, 999);
+
+                filtroData.DisponibilidadeData = {
+                    gte: inicio,
+                    lte: fim
+                };
+            }
+
+            // Buscar disponibilidades com include do prestador
+            const disponibilidades = await prisma.disponibilidade.findMany({
+                where: {
+                    EstabelecimentoId: parseInt(estabelecimentoId),
+                    ...filtroData
+                },
+                include: {
+                    prestador: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true,
+                            UsuarioTelefone: true
+                        }
+                    }
+                },
+                orderBy: [
+                    {
+                        DisponibilidadeData: 'asc'
+                    },
+                    {
+                        DisponibilidadeHoraInicio: 'asc'
+                    }
+                ]
+            });
+
+            // No método listarDisponibilidadesPorEstabelecimento
+            const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+            // Formatar disponibilidades
+            let disponibilidadesFormatadas = disponibilidades.map(disp => ({
+                ...disp,
+                prestadorNome: disp.prestador?.UsuarioNome || 'Prestador não informado',
+                dataFormatada: formatarData(disp.DisponibilidadeData),
+                diaSemana: disp.DisponibilidadeData.getDay(),
+                diaSemanaDescricao: diasSemana[disp.DisponibilidadeData.getDay()]
+            }));
+
+            // Agrupar por data
+            const disponibilidadesPorData = disponibilidadesFormatadas.reduce((acc, disp) => {
+                const data = disp.DisponibilidadeData.toISOString().split('T')[0];
+                if (!acc[data]) {
+                    acc[data] = {
+                        data: data,
+                        dataFormatada: disp.dataFormatada,
+                        diaSemana: disp.diaSemana,
+                        diaSemanaDescricao: diasSemana[disp.diaSemana],
+                        disponibilidades: []
+                    };
+                }
+                acc[data].disponibilidades.push(disp);
+                return acc;
+            }, {});
+
+            //console.log('disponibilidadesFormatadas = ', disponibilidadesFormatadas);
+            //console.log('agrupadoPorData = ', Object.values(disponibilidadesPorData));
+
+            res.status(200).json({
+                success: true,
+                data: disponibilidadesFormatadas,
+                agrupadoPorData: Object.values(disponibilidadesPorData),
+                estabelecimento: {
+                    id: parseInt(estabelecimentoId)
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar disponibilidades por estabelecimento:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
 }
 
 module.exports = new DisponibilidadeController();

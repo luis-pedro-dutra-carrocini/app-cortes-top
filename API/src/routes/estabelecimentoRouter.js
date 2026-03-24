@@ -1,4 +1,4 @@
-// src/routes/estabelecimentoRoutes.js
+// src/routes/estabelecimentoRouter.js
 const express = require('express');
 const estabelecimentoController = require('../controllers/estabelecimentoController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -24,6 +24,7 @@ router.get('/:estabelecimentoId/prestadores-disponiveis', estabelecimentoControl
 router.patch('/vinculos/:vinculoId/aceitar', estabelecimentoController.aceitarVinculo);
 router.patch('/vinculos/:vinculoId/recusar', estabelecimentoController.recusarVinculo);
 router.patch('/vinculos/:vinculoId/desativar', estabelecimentoController.desativarVinculo);
+router.patch('/vinculos/:vinculoId/reativar', estabelecimentoController.reativarVinculo);
 router.delete('/vinculos/:vinculoId', estabelecimentoController.excluirVinculo);
 
 // Rotas de vínculo de usuários
@@ -31,5 +32,8 @@ router.post('/:estabelecimentoId/usuarios/:usuarioId', estabelecimentoController
 router.delete('/:estabelecimentoId/usuarios/:usuarioId', estabelecimentoController.desvincularUsuario);
 router.get('/:estabelecimentoId/usuarios', estabelecimentoController.listarUsuariosVinculados);
 router.get('/:estabelecimentoId/prestadores-disponiveis', estabelecimentoController.listarPrestadoresDisponiveis);
+
+// Pretador vê seus vinculos com estabelcimentos
+router.get('/prestador/vinculos/todos', estabelecimentoController.listarVinculosPrestador);
 
 module.exports = router;

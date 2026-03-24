@@ -151,6 +151,9 @@ class AgendamentoController {
                 tempoTotal += servico.ServicoTempoMedio;
             });
 
+            // Obtem o ID do estabelecimento na disponibilidade, se houver
+            const estabelecimentoId = disponibilidade.EstabelecimentoId;
+
             // Criar agendamento em transação
             const resultado = await prisma.$transaction(async (prisma) => {
                 // Criar agendamento
@@ -164,7 +167,8 @@ class AgendamentoController {
                         AgendamentoValorTotal: valorTotal,
                         AgendamentoTempoGasto: tempoTotal,
                         AgendamentoStatus: 'PENDENTE',
-                        AgendamentoObservacao: AgendamentoObservacao || null
+                        AgendamentoObservacao: AgendamentoObservacao || null,
+                        EstabelecimentoId: estabelecimentoId
                     }
                 });
 
@@ -180,7 +184,8 @@ class AgendamentoController {
                         prisma.servicoAgendamento.create({
                             data: {
                                 AgendamentoId: agendamento.AgendamentoId,
-                                ServicoId: servico.ServicoId
+                                ServicoId: servico.ServicoId,
+                                ServicoValor: servico.precos[0].ServicoValor
                             }
                         })
                     )
@@ -282,14 +287,23 @@ class AgendamentoController {
                                 }
                             }
                         }
+                    },
+                    estabelecimento: {
+                        include: {
+                            empresa: {
+                                select: {
+                                    EmpresaNome: true
+                                }
+                            }
+                        }
                     }
                 },
                 orderBy: [
                     {
-                        AgendamentoDtServico: 'desc'
+                        AgendamentoDtServico: 'asc'
                     },
                     {
-                        AgendamentoHoraServico: 'desc'
+                        AgendamentoHoraServico: 'asc'
                     }
                 ]
             });
@@ -309,6 +323,116 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao listar agendamentos:', error);
             res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
+    // Listar todos os agendamentos do cliente com filtro de período
+    async listarMeusAgendamentosClienteTodos(req, res) {
+        try {
+            const { dataInicio, dataFim, status } = req.query;
+
+            // Definir período padrão (último ano)
+            const hoje = new Date();
+            const inicioPadrao = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate());
+            const fimPadrao = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+
+            // Construir where dinâmico
+            const where = {
+                ClienteId: req.usuario.usuarioId
+            };
+
+            // Aplicar filtro de período
+            if (dataInicio && dataFim) {
+                const inicio = new Date(dataInicio);
+                inicio.setHours(0, 0, 0, 0);
+                const fim = new Date(dataFim);
+                fim.setHours(23, 59, 59, 999);
+                where.AgendamentoDtServico = {
+                    gte: inicio,
+                    lte: fim
+                };
+            } else {
+                // Período padrão: último ano
+                where.AgendamentoDtServico = {
+                    gte: inicioPadrao,
+                    lte: fimPadrao
+                };
+            }
+
+            // Aplicar filtro de status se fornecido
+            if (status) {
+                where.AgendamentoStatus = status;
+            }
+
+            const agendamentos = await prisma.agendamento.findMany({
+                where,
+                include: {
+                    prestador: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true,
+                            UsuarioEmail: true,
+                            UsuarioTelefone: true
+                        }
+                    },
+                    servicos: {
+                        include: {
+                            servico: {
+                                select: {
+                                    ServicoId: true,
+                                    ServicoNome: true,
+                                    ServicoDescricao: true,
+                                    ServicoTempoMedio: true
+                                }
+                            }
+                        }
+                    },
+                    estabelecimento: {
+                        include: {
+                            empresa: {
+                                select: {
+                                    EmpresaNome: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: [
+                    {
+                        AgendamentoDtServico: 'desc'
+                    },
+                    {
+                        AgendamentoHoraServico: 'desc'
+                    },
+                    {
+                        AgendamentoDtCriacao: 'desc'
+                    }
+                ]
+            });
+
+            // Formatar resposta
+            const agendamentosFormatados = agendamentos.map(ag => ({
+                ...ag,
+                AgendamentoValorTotal: parseFloat(ag.AgendamentoValorTotal),
+                servicos: ag.servicos.map(s => s.servico)
+            }));
+
+            res.status(200).json({
+                success: true,
+                data: agendamentosFormatados,
+                total: agendamentos.length,
+                periodo: {
+                    dataInicio: dataInicio || inicioPadrao.toISOString().split('T')[0],
+                    dataFim: dataFim || fimPadrao.toISOString().split('T')[0]
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar agendamentos do cliente:', error);
+            res.status(500).json({
+                success: false,
                 error: error.message
             });
         }
@@ -374,10 +498,10 @@ class AgendamentoController {
                 },
                 orderBy: [
                     {
-                        AgendamentoDtServico: 'desc'
+                        AgendamentoDtServico: 'asc'
                     },
                     {
-                        AgendamentoHoraServico: 'desc'
+                        AgendamentoHoraServico: 'asc'
                     }
                 ]
             });
@@ -388,6 +512,8 @@ class AgendamentoController {
                 AgendamentoValorTotal: parseFloat(ag.AgendamentoValorTotal),
                 servicos: ag.servicos.map(s => s.servico)
             }));
+
+            //console.log('agendamentosFormatados = ', agendamentosFormatados);
 
             res.status(200).json({
                 data: agendamentosFormatados,
@@ -417,7 +543,6 @@ class AgendamentoController {
                         select: {
                             UsuarioId: true,
                             UsuarioNome: true,
-                            UsuarioEmail: true,
                             UsuarioTelefone: true
                         }
                     },
@@ -425,19 +550,26 @@ class AgendamentoController {
                         select: {
                             UsuarioId: true,
                             UsuarioNome: true,
-                            UsuarioEmail: true,
                             UsuarioTelefone: true
                         }
                     },
                     servicos: {
                         include: {
                             servico: {
-                                include: {
-                                    precos: {
-                                        orderBy: {
-                                            ServicoPrecoDtCriacao: 'desc'
-                                        }
-                                    }
+                                select: {
+                                    ServicoId: true,
+                                    ServicoNome: true,
+                                    ServicoDescricao: true,
+                                    ServicoTempoMedio: true
+                                }
+                            }
+                        }
+                    },
+                    estabelecimento: {
+                        include: {
+                            empresa: {
+                                select: {
+                                    EmpresaNome: true
                                 }
                             }
                         }
@@ -457,20 +589,50 @@ class AgendamentoController {
                 });
             }
 
-            // Formatar resposta
+            let endereco;
+            //console.log('agendamento.EstabelecimentoId = ', agendamento.EstabelecimentoId);
+            if (agendamento.EstabelecimentoId) {
+                endereco = await prisma.endereco.findFirst({
+                    where: {
+                        UsuEstId: agendamento.EstabelecimentoId,
+                        TipoRelacao: 'ESTABELECIMENTO'
+                    },
+                });
+            } else if (agendamento.PrestadorId) {
+                endereco = await prisma.endereco.findFirst({
+                    where: {
+                        UsuEstId: agendamento.PrestadorId,
+                        TipoRelacao: 'USUARIO'
+                    },
+                });
+            }
+
+            //Rua 7, N° 1234 B, Jardim Rotatória, Sales Oliveira - SP. Complemento...
+            const enderecoFormatado = endereco.EnderecoRua + ', N° ' + endereco.EnderecoNumero + ', ' + endereco.EnderecoBairro + ', ' + endereco.EnderecoCidade + ' - ' + endereco.EnderecoEstado + '. \n' + endereco.EnderecoComplemento
+
+            let contatoTelefone;
+            if (agendamento.EstabelecimentoId) {
+                contatoTelefone = agendamento.estabelecimento.EstabelecimentoTelefone;
+            } else {
+                contatoTelefone = agendamento.prestador.UsuarioTelefone;
+            }
+
+            // Formatar resposta - USAR O VALOR ARMAZENADO NO ServicoAgendamento
             const respostaFormatada = {
                 ...agendamento,
                 AgendamentoValorTotal: parseFloat(agendamento.AgendamentoValorTotal),
                 servicos: agendamento.servicos.map(sa => ({
                     ServicoAgendamentoId: sa.ServicoAgendamentoId,
                     servico: {
-                        ...sa.servico,
-                        precos: sa.servico.precos.map(p => ({
-                            ...p,
-                            ServicoValor: parseFloat(p.ServicoValor)
-                        }))
+                        ServicoId: sa.servico.ServicoId,
+                        ServicoNome: sa.servico.ServicoNome,
+                        ServicoDescricao: sa.servico.ServicoDescricao,
+                        ServicoTempoMedio: sa.servico.ServicoTempoMedio,
+                        valorNoMomento: parseFloat(sa.ServicoValor)
                     }
-                }))
+                })),
+                endereco: enderecoFormatado,
+                contatoTelefone: contatoTelefone
             };
 
             res.status(200).json({ data: respostaFormatada });
@@ -1088,6 +1250,62 @@ class AgendamentoController {
             });
         }
     }
+
+    // Buscar últimas empresas com agendamentos do cliente
+    async buscarUltimasEmpresas(req, res) {
+        try {
+            const clienteId = req.usuario.usuarioId;
+
+            // Buscar os 3 agendamentos mais recentes do cliente com estabelecimento
+            const agendamentos = await prisma.agendamento.findMany({
+                where: {
+                    ClienteId: clienteId,
+                    EstabelecimentoId: { not: null }
+                },
+                include: {
+                    estabelecimento: {
+                        include: {
+                            empresa: {
+                                select: {
+                                    EmpresaId: true,
+                                    EmpresaNome: true,
+                                    EmpresaTelefone: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: {
+                    AgendamentoDtServico: 'desc'
+                },
+                distinct: ['EstabelecimentoId'],
+                take: 3
+            });
+
+            // Extrair empresas únicas
+            const empresasMap = new Map();
+            agendamentos.forEach(ag => {
+                const empresa = ag.estabelecimento?.empresa;
+                if (empresa && !empresasMap.has(empresa.EmpresaId)) {
+                    empresasMap.set(empresa.EmpresaId, {
+                        id: empresa.EmpresaId,
+                        nome: empresa.EmpresaNome,
+                        telefone: empresa.EmpresaTelefone
+                    });
+                }
+            });
+
+            res.status(200).json({
+                success: true,
+                data: Array.from(empresasMap.values())
+            });
+
+        } catch (error) {
+            console.error('Erro ao buscar últimas empresas:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
 }
 
 module.exports = new AgendamentoController();

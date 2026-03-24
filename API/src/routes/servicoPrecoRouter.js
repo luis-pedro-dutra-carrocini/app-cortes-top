@@ -16,6 +16,9 @@ router.get('/:precoId', servicoPrecoController.buscarPrecoId);
 // Rota de criação (apenas PRESTADOR dono do serviço)
 router.post('/servico/:servicoId', servicoPrecoController.adicionarPreco);
 
+// Rota para empresa atualizar preço de todos os prestadores vinculados a um serviço do estabelecimento
+router.post('/servico-estabelecimento/:servicoEstabelecimentoId/preco-unificado', servicoPrecoController.atualizarPrecoServicoEstabelecimento);
+
 // NOTA: Não há rotas para update (PUT/PATCH) ou delete
 // Isso garante que o histórico não possa ser alterado ou excluído
 

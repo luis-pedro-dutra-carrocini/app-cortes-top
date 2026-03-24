@@ -1,3 +1,4 @@
+// src/routes/dashboardRouter.js
 const express = require('express');
 const dashboardController = require('../controllers/dashboardController');
 const authMiddleware = require('../middlewares/authMiddleware');

@@ -65,6 +65,8 @@ enum UsuarioEstabelecimentoStatus {
   ATIVO           // Ativado
   SOLICITADOEST   // Estabelecimento solicitou vinculo
   SOLICITADOPRE   // Prestador solicitou vinculo
+  RECUSADOEST     // Estabelecimento recusou vinculo
+  RECUSADOPRE     // Prestador recusou vinculo
   INATIVO         // Inativado pelo estabelecimento/empresa
   EXCLUIDO        // Excluido pelo estabelecimento/empresa ou pelo prestador
   BLOQUEADO       // Boqueado pelo sistema (falta de pagamento, etc)
@@ -103,7 +105,7 @@ model Estabelecimento {
   servicos         ServicoEstabelecimento[]
   precos           ServicoPreco[]
   agendamentos     Agendamento[]
-  usuarios         UsuarioEsatablecimento[]
+  usuarios         UsuarioEstabelecimento[]
   disponibilidades Disponibilidade[]
 }
 
@@ -122,12 +124,12 @@ model Usuario {
   // Relações
   disponibilidades Disponibilidade[]
   servicos         Servico[]
-  estabelecimentos UsuarioEsatablecimento[]
+  estabelecimentos UsuarioEstabelecimento[]
   agendamentos_cli Agendamento[]      @relation("ClienteAgendamentos")
   agendamentos_pre Agendamento[]      @relation("PrestadorAgendamentos")
 }
 
-model UsuarioEsatablecimento {
+model UsuarioEstabelecimento {
   UsuarioEstabelecimentoId        Int      @id @default(autoincrement())
   UsuarioId                       Int
   EstabelecimentoId               Int
@@ -212,7 +214,7 @@ model Agendamento {
   PrestadorId                   Int
   ClienteId                     Int
   DisponibilidadeId             Int
-  EstabelecimentoId             Int?              // Opcional, caso o agendamento seja para um serviço de um estabelecimento
+  EstabelecimentoId             Int?              // Opcional, caso o agendamento seja de um estabelecimento
   AgendamentoDtCriacao          DateTime          @default(now())
   AgendamentoDtServico          DateTime                              // Apenas a data
   AgendamentoHoraServico        String            @db.VarChar(5)      // Ex: "14:30"
