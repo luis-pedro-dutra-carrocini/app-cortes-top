@@ -13,6 +13,7 @@ router.get('/meus-cliente', agendamentoController.listarMeusAgendamentosClienteP
 router.get('/meus-agendamentos/todos', agendamentoController.listarMeusAgendamentosClienteTodos);
 router.get('/meus-prestador', agendamentoController.listarMeusAgendamentosPrestador);
 router.get('/periodo', agendamentoController.listarAgendamentosPorPeriodo);
+router.get('/empresa/agendamentos', agendamentoController.listarAgendamentosEmpresa);
 
 // Rotas de manipulação
 router.post('/', agendamentoController.cadastrarAgendamento); // Apenas CLIENTE

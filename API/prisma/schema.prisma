@@ -72,7 +72,21 @@ enum UsuarioEstabelecimentoStatus {
   BLOQUEADO       // Boqueado pelo sistema (falta de pagamento, etc)
 }
 
+enum LogTipoRelacao {
+  USUARIO
+  EMPRESA
+  SISTEMA
+  OUTRO
+}
 
+
+model Administrador {
+  AdministradorId          Int      @id @default(autoincrement())
+  AdministradorNome        String   @unique @db.VarChar(100)
+  AdministradorUsuario     String   @db.VarChar(20)
+  AdministradorSenha       String
+  AdministradorUltimoLogin DateTime?
+}
 
 model Empresa {
   EmpresaId           Int      @id @default(autoincrement())
@@ -243,8 +257,8 @@ model ServicoAgendamento {
 }
 
 model Notificacao {
-  Notificacaoid             Int                 @id @default(autoincrement())
-  UsuEmpId                  Int                                    // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao
+  NotificacaoId             String              @id @default(uuid())
+  UsuEmpId                  Int                 // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao
   TipoRelacao               UsuEmpRelacao       @default(USUARIO)  // 'USUARIO' ou 'EMPRESA'
   NotificacaoData           DateTime            @default(now())
   NotificacaoTipo           String              @db.VarChar(50)
@@ -254,10 +268,10 @@ model Notificacao {
 }
 
 model Log {
-  LogId           Int             @id @default(autoincrement())
-  UsuEmpId        UsuEmpRelacao?  // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao
-  TipoRelacao     String          @db.VarChar(50)  // 'USUARIO' ou 'EMPRESA'
+  LogId           String          @id @default(uuid())
+  UsuEmpId        UsuEmpRelacao?  // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao  alguns casos não será nenhum dos dois, como por exemplo, erros do sistema, etc
+  TipoRelacao     LogTipoRelacao  // 'USUARIO' ou 'EMPRESA' ou 'SISTEMA' ou outros tipos de relação
   LogAcao         String          @db.VarChar(20)
   LogDetalhe      String
-  LogDataHora     DateTime        @default(now())
+  LogData         DateTime        @default(now())
 }

@@ -18,6 +18,8 @@ router.get('/validar-token', authMiddleware, (req, res) => {
 // Se quiser que seja pública, remova o middleware
 router.get('/:usuarioId', authMiddleware, usuarioController.buscarUsuarioId);
 
+router.post('/logout', authMiddleware, usuarioController.logout);
+
 // Listar últimos prestadores do cliente (apenas CLIENTE)
 router.get('/prestadores/ultimos', authMiddleware, usuarioController.listarUltimosPrestadoresCliente);
 

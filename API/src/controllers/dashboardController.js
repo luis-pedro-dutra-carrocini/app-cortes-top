@@ -135,12 +135,12 @@ class DashboardController {
                 const minutosInicio = horaInicio[0] * 60 + horaInicio[1];
                 const minutosFim = horaFim[0] * 60 + horaFim[1];
 
-                if (disp.DisponibilidadeStatus){
+                if (disp.DisponibilidadeStatus) {
                     horasDisponiveis += (minutosFim - minutosInicio) / 60; // Converter para horas
-                }else{
+                } else {
                     horasReservadas += (minutosFim - minutosInicio) / 60; // Converter para horas
                 }
-            
+
             });
 
             // Processar agendamentos
@@ -243,37 +243,49 @@ class DashboardController {
             // Serviços mais solicitados
             const servicosMap = new Map();
 
-            agendamentos.forEach(ag => {
-                ag.servicos.forEach(sa => {
-                    //console.log('sa = ', sa);
-                    //console.log('sa.servico = ', sa.servico);
+            // Processar agendamentos
+            for (const ag of agendamentos) {
+                // Processar os serviços de cada agendamento
+                for (const sa of ag.servicos) {
                     const servicoId = sa.servico.ServicoId;
                     const servicoValor = sa.ServicoValor;
                     const servicoNome = sa.servico.ServicoNome;
 
                     if (ag.AgendamentoStatus === 'CONCLUIDO') {
+                        let estabelecimentoNome = '';
+
+                        // Verificar se o serviço tem vínculo com estabelecimento
+                        if (sa.servico.ServicoEstabelecimentoId !== null &&
+                            sa.servico.ServicoEstabelecimentoId !== undefined) {
+                            const estabelecimento = await prisma.estabelecimento.findUnique({
+                                where: {
+                                    EstabelecimentoId: sa.servico.ServicoEstabelecimentoId
+                                },
+                                select: {
+                                    EstabelecimentoNome: true
+                                }
+                            });
+
+                            if (estabelecimento && estabelecimento.EstabelecimentoNome) {
+                                estabelecimentoNome = ` (${estabelecimento.EstabelecimentoNome})`;
+                            }
+                        }
 
                         if (!servicosMap.has(servicoId)) {
                             servicosMap.set(servicoId, {
                                 id: servicoId,
-                                nome: servicoNome,
+                                nome: servicoNome + estabelecimentoNome,
                                 quantidade: 0,
                                 valorTotal: 0
                             });
                         }
 
                         const servico = servicosMap.get(servicoId);
-
                         servico.quantidade++;
-
-                        servico.valorTotal += servicoValor;
-
-                        //servico.valorTotal += parseFloat(ag.AgendamentoValorTotal) / ag.servicos.length; // Dividir proporcionalmente
+                        servico.valorTotal = Number(servico.valorTotal) + Number(servicoValor);
                     }
-
-
-                });
-            });
+                }
+            }
 
             const servicosMaisSolicitados = Array.from(servicosMap.values())
                 .sort((a, b) => b.quantidade - a.quantidade)
@@ -449,7 +461,7 @@ class DashboardController {
             });
         }
     }
-    
+
 }
 
 module.exports = new DashboardController();

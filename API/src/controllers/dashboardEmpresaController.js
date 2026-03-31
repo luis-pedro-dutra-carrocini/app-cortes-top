@@ -102,6 +102,7 @@ class DashboardEmpresaController {
             let agendamentosEmAndamento = 0;
             let agendamentosConcluidos = 0;
             let agendamentosCancelados = 0;
+            let agendamentosRecusados = 0;
             let faturamentoRealizado = 0;
             let faturamentoPrevisto = 0;
 
@@ -128,6 +129,9 @@ class DashboardEmpresaController {
                         break;
                     case 'CANCELADO':
                         agendamentosCancelados++;
+                        break;
+                    case 'RECUSADO':
+                        agendamentosRecusados++;
                         break;
                 }
             });
@@ -238,6 +242,7 @@ class DashboardEmpresaController {
                         emAndamento: agendamentosEmAndamento,
                         concluidos: agendamentosConcluidos,
                         cancelados: agendamentosCancelados,
+                        recusados: agendamentosRecusados,
                         total: agendamentos.length
                     },
                     faturamento: {

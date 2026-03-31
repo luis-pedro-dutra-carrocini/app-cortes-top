@@ -31,7 +31,8 @@ class UsuarioController {
                 });
 
                 if (!empresa) {
-                    return res.status(401).json({
+                    //return res.status(401).json({
+                    return res.status(403).json({
                         error: 'E-mail ou senha inválidos'
                     });
                 }
@@ -46,7 +47,8 @@ class UsuarioController {
                 const senhaValida = await bcrypt.compare(UsuarioSenha, empresa.EmpresaSenha);
 
                 if (!senhaValida) {
-                    return res.status(401).json({
+                    //return res.status(401).json({]
+                    return res.status(403).json({
                         error: 'E-mail ou senha inválidos'
                     });
                 }
@@ -76,14 +78,18 @@ class UsuarioController {
                     UsuarioTipo: 'EMPRESA',
                     UsuarioDtCriacao: empresa.EmpresaDtCriacao,
                     UsuarioAtivo: UsuarioAtivo,
-                    // Adicionar CNPJ da empresa
                     EmpresaCNPJ: empresa.EmpresaCNPJ
                 };
 
                 // Atualizar último login
+                const dataLocal = new Date();
+
+                // Ajusta para o fuso de Brasília (UTC -3)
+                const dataBrasilia = new Date(dataLocal.getTime() - (3 * 60 * 60 * 1000));
+                
                 await prisma.empresa.update({
                     where: { EmpresaId: empresa.EmpresaId },
-                    data: { EmpresaUltimoLogin: new Date() }
+                    data: { EmpresaUltimoLogin: dataBrasilia }
                 });
 
             } else {
@@ -97,7 +103,8 @@ class UsuarioController {
                 });
 
                 if (!usuario) {
-                    return res.status(401).json({
+                    //return res.status(401).json({
+                    return res.status(403).json({
                         error: 'E-mail ou senha inválidos'
                     });
                 }
@@ -112,7 +119,8 @@ class UsuarioController {
                 const senhaValida = await bcrypt.compare(UsuarioSenha, usuario.UsuarioSenha);
 
                 if (!senhaValida) {
-                    return res.status(401).json({
+                    //return res.status(401).json({
+                    return res.status(403).json({
                         error: 'E-mail ou senha inválidos'
                     });
                 }
@@ -143,6 +151,17 @@ class UsuarioController {
                     UsuarioDtCriacao: usuario.UsuarioDtCriacao,
                     UsuarioAtivo: UsuarioAtivo
                 };
+
+                // Atualizar último login
+                const dataLocal = new Date();
+
+                // Ajusta para o fuso de Brasília (UTC -3)
+                const dataBrasilia = new Date(dataLocal.getTime() - (3 * 60 * 60 * 1000));
+
+                await prisma.usuario.update({
+                    where: { UsuarioId: usuario.UsuarioId },
+                    data: { UsuarioUltimoLogin: dataBrasilia }
+                });
 
                 // Buscar endereço SEPARADAMENTE se for PRESTADOR
                 if (usuario.UsuarioTipo === 'PRESTADOR' && usuario.UsuarioEnderecoId) {
@@ -1120,7 +1139,7 @@ class UsuarioController {
                     // 4. Retirando o usuário dos estabelecimentos que ele estava vinculado
                     await prisma.usuarioEstabelecimento.update({
                         where: { UsuarioId: usuarioId },
-                        data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO'}
+                        data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO' }
                     });
 
                     // 5. Desativando os serviços dos prestadores vinculados aos estabelecimentos da empresa
@@ -1149,6 +1168,43 @@ class UsuarioController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    // Rota que registra o logout do usuário (apenas para clientes e prestadores)
+    async logout(req, res) {
+        try {
+            const usuarioId = req.usuario.usuarioId;
+
+            const usuarioTipo = req.usuario.usuarioTipo;
+
+            if (usuarioTipo !== 'CLIENTE' && usuarioTipo !== 'PRESTADOR') {
+                return res.status(403).json({
+                    error: 'Tipo de usuário inválido para logout'
+                });
+            }
+
+            // Adiocnar registro na tabela log
+            await prisma.log.create({
+                data: {
+                    UsuEmpId: usuarioId,
+                    LogAcao: 'LOGOUT',
+                    TipoRelacao: 'USUARIO',
+                    LogDetalhe: 'Usuário realizou logout',
+                    LogData: new Date()
+                }
+            });
+
+            res.status(200).json({
+                message: 'Logout realizado com sucesso'
+            });
+
+        } catch (error) {
+            console.error('Erro ao buscar usuário:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
+
 }
 
 module.exports = new UsuarioController();

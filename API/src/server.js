@@ -2,8 +2,21 @@
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
 
 const app = express();
+
+const corsOptions = {
+    origin: 'http://localhost:3001',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Inclua OPTIONS
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 
 // Middleware para cookies
 app.use(cookieParser());
@@ -27,8 +40,9 @@ const dashboardRouter = require('./routes/dashboardRouter');
 const estabelecimentoRouter = require('./routes/estabelecimentoRouter');
 const servicoEstabelecimentoRouter = require('./routes/servicoEstabelecimentoRouter');
 const empresaRouter = require('./routes/empresaRouter');
-const pesquisaRoutes = require('./routes/pesquisaRoutes');
-const dashboardEmpresaRoutes = require('./routes/dashboardEmpresaRouter');
+const pesquisaRouter = require('./routes/pesquisaRouter');
+const dashboardEmpresaRouter = require('./routes/dashboardEmpresaRouter');
+const administradorRouter = require('./routes/administradorRouter');
 
 app.use('/api/agendamento', agendamentoRouter);
 app.use('/api/disponibilidade', disponibilidadeRouter);
@@ -39,8 +53,9 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/estabelecimento', estabelecimentoRouter);
 app.use('/api/servicoEstabelecimento', servicoEstabelecimentoRouter);
 app.use('/api/empresa', empresaRouter);
-app.use('/api/pesquisa', pesquisaRoutes);
-app.use('/api/dashboard-empresa', dashboardEmpresaRoutes);
+app.use('/api/pesquisa', pesquisaRouter);
+app.use('/api/dashboard-empresa', dashboardEmpresaRouter);
+app.use('/api/admin', administradorRouter);
 
 // Health check
 app.get('/health', (req, res) => {

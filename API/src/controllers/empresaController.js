@@ -169,6 +169,7 @@ class EmpresaController {
             res.status(500).json({ error: error.message });
         }
     }
+    
 }
 
 module.exports = new EmpresaController();

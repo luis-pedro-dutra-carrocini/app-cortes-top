@@ -130,7 +130,7 @@ class AgendamentoController {
                     PrestadorId: parseInt(PrestadorId),
                     AgendamentoDtServico: dataServico,
                     AgendamentoHoraServico: AgendamentoHoraServico,
-                    AgendamentoStatus: { notIn: ['CANCELADO', 'CONCLUIDO'] }
+                    AgendamentoStatus: { notIn: ['CANCELADO', 'CONCLUIDO', 'RECUSADO'] }
                 }
             });
 
@@ -333,10 +333,10 @@ class AgendamentoController {
         try {
             const { dataInicio, dataFim, status } = req.query;
 
-            // Definir período padrão (último ano)
+            // Definir período padrão (último ano + três meses)
             const hoje = new Date();
             const inicioPadrao = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate());
-            const fimPadrao = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+            const fimPadrao = new Date(hoje.getFullYear(), hoje.getMonth() + 3, hoje.getDate(), 23, 59, 59);
 
             // Construir where dinâmico
             const where = {
@@ -387,7 +387,7 @@ class AgendamentoController {
                                     ServicoTempoMedio: true
                                 }
                             }
-                        }
+                        },
                     },
                     estabelecimento: {
                         include: {
@@ -412,12 +412,22 @@ class AgendamentoController {
                 ]
             });
 
+            //console.log('agendamentos = ', agendamentos);
+
             // Formatar resposta
             const agendamentosFormatados = agendamentos.map(ag => ({
                 ...ag,
                 AgendamentoValorTotal: parseFloat(ag.AgendamentoValorTotal),
-                servicos: ag.servicos.map(s => s.servico)
+                servicos: ag.servicos.map(s => ({
+                    ServicoAgendamentoId: s.ServicoAgendamentoId,
+                    ServicoId: s.ServicoId,
+                    ServicoValor: parseFloat(s.ServicoValor),
+                    AgendamentoId: s.AgendamentoId,
+                    servico: s.servico
+                }))
             }));
+
+            console.log('agendamentosFormatados = ', JSON.stringify(agendamentosFormatados, null, 2));
 
             res.status(200).json({
                 success: true,
@@ -510,10 +520,17 @@ class AgendamentoController {
             const agendamentosFormatados = agendamentos.map(ag => ({
                 ...ag,
                 AgendamentoValorTotal: parseFloat(ag.AgendamentoValorTotal),
-                servicos: ag.servicos.map(s => s.servico)
+                servicos: ag.servicos.map(s => ({
+                    ServicoAgendamentoId: s.ServicoAgendamentoId,
+                    ServicoId: s.ServicoId,
+                    ServicoValor: parseFloat(s.ServicoValor),
+                    AgendamentoId: s.AgendamentoId,
+                    servico: s.servico
+                }))
             }));
 
             //console.log('agendamentosFormatados = ', agendamentosFormatados);
+            //console.log('Agendamentos:', JSON.stringify(agendamentos, null, 2));
 
             res.status(200).json({
                 data: agendamentosFormatados,
@@ -526,6 +543,128 @@ class AgendamentoController {
             res.status(500).json({
                 error: error.message
             });
+        }
+    }
+
+    // Listar agendamentos dos estabelecimentos da empresa
+    async listarAgendamentosEmpresa(req, res) {
+        try {
+            const empresaId = req.usuario.usuarioId;
+            const { estabelecimentoId, dataInicio, dataFim, status } = req.query;
+
+            // Verificar se é empresa
+            if (req.usuario.usuarioTipo !== 'EMPRESA') {
+                return res.status(403).json({
+                    error: 'Apenas empresas podem acessar esta rota'
+                });
+            }
+
+            // Buscar estabelecimentos da empresa
+            const whereEstabelecimentos = { EmpresaId: empresaId };
+            if (estabelecimentoId) {
+                whereEstabelecimentos.EstabelecimentoId = parseInt(estabelecimentoId);
+            }
+
+            const estabelecimentos = await prisma.estabelecimento.findMany({
+                where: whereEstabelecimentos,
+                select: { EstabelecimentoId: true }
+            });
+
+            const estabelecimentoIds = estabelecimentos.map(e => e.EstabelecimentoId);
+
+            if (estabelecimentoIds.length === 0) {
+                return res.status(200).json({ data: [], total: 0 });
+            }
+
+            // Construir where dinâmico
+            const where = {
+                EstabelecimentoId: { in: estabelecimentoIds }
+            };
+
+            // Aplicar filtro de data se fornecido
+            if (dataInicio || dataFim) {
+                where.AgendamentoDtServico = {};
+                if (dataInicio) {
+                    const inicio = new Date(dataInicio);
+                    inicio.setHours(0, 0, 0, 0);
+                    where.AgendamentoDtServico.gte = inicio;
+                }
+                if (dataFim) {
+                    const fim = new Date(dataFim);
+                    fim.setHours(23, 59, 59, 999);
+                    where.AgendamentoDtServico.lte = fim;
+                }
+            }
+
+            // Aplicar filtro de status se fornecido
+            if (status) {
+                where.AgendamentoStatus = status;
+            }
+
+            const agendamentos = await prisma.agendamento.findMany({
+                where: where,
+                include: {
+                    cliente: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true,
+                            UsuarioTelefone: true
+                        }
+                    },
+                    prestador: {
+                        select: {
+                            UsuarioId: true,
+                            UsuarioNome: true
+                        }
+                    },
+                    estabelecimento: {
+                        select: {
+                            EstabelecimentoNome: true
+                        }
+                    },
+                    servicos: {
+                        include: {
+                            servico: {
+                                select: {
+                                    ServicoId: true,
+                                    ServicoNome: true,
+                                    ServicoDescricao: true,
+                                    ServicoTempoMedio: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: [
+                    { AgendamentoDtServico: 'desc' },
+                    { AgendamentoHoraServico: 'desc' }
+                ]
+            });
+
+            // Formatar resposta
+            const agendamentosFormatados = agendamentos.map(ag => ({
+                ...ag,
+                AgendamentoValorTotal: parseFloat(ag.AgendamentoValorTotal),
+                servicos: ag.servicos.map(s => ({
+                    ServicoAgendamentoId: s.ServicoAgendamentoId,
+                    ServicoId: s.ServicoId,
+                    ServicoValor: parseFloat(s.ServicoValor),
+                    AgendamentoId: s.AgendamentoId,
+                    servico: s.servico
+                }))
+            }));
+
+            //console.log('agendamentosFormatados:', JSON.stringify(agendamentosFormatados, null, 2));
+
+            res.status(200).json({
+                data: agendamentosFormatados,
+                total: agendamentos.length,
+                periodo: dataInicio || dataFim ? { dataInicio, dataFim } : null
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar agendamentos da empresa:', error);
+            res.status(500).json({ error: error.message });
         }
     }
 
@@ -569,7 +708,8 @@ class AgendamentoController {
                         include: {
                             empresa: {
                                 select: {
-                                    EmpresaNome: true
+                                    EmpresaNome: true,
+                                    EmpresaId: true
                                 }
                             }
                         }
@@ -582,8 +722,9 @@ class AgendamentoController {
             }
 
             // Verificar se o usuário tem permissão (é o cliente ou o prestador)
-            if (agendamento.ClienteId !== req.usuario.usuarioId &&
-                agendamento.PrestadorId !== req.usuario.usuarioId) {
+            if ((agendamento.ClienteId === req.usuario.usuarioId && req.usuario.usuarioTipo === 'CLIENTE') ||
+                (agendamento.PrestadorId === req.usuario.usuarioId && req.usuario.usuarioTipo === 'PRESTADOR') || (agendamento.estabelecimento.empresa.EmpresaId === req.usuario.usuarioId && req.usuario.usuarioTipo === 'EMPRESA')) {
+            } else {
                 return res.status(403).json({
                     error: 'Você não tem permissão para visualizar este agendamento'
                 });
@@ -623,6 +764,7 @@ class AgendamentoController {
                 AgendamentoValorTotal: parseFloat(agendamento.AgendamentoValorTotal),
                 servicos: agendamento.servicos.map(sa => ({
                     ServicoAgendamentoId: sa.ServicoAgendamentoId,
+                    ServicoValor: parseFloat(sa.ServicoValor),
                     servico: {
                         ServicoId: sa.servico.ServicoId,
                         ServicoNome: sa.servico.ServicoNome,
@@ -634,6 +776,8 @@ class AgendamentoController {
                 endereco: enderecoFormatado,
                 contatoTelefone: contatoTelefone
             };
+
+            //console.log('respostaFormatada = ', respostaFormatada);
 
             res.status(200).json({ data: respostaFormatada });
 
@@ -649,7 +793,7 @@ class AgendamentoController {
     async atualizarStatus(req, res) {
         try {
             const agendamentoId = parseInt(req.params.id);
-            const { AgendamentoStatus } = req.body;
+            const { AgendamentoStatus, AgendamentoDescricaoTrabalho } = req.body;
 
             const statusValidos = ['PENDENTE', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO'];
 
@@ -693,7 +837,7 @@ class AgendamentoController {
             // Atualizar status
             const agendamentoAtualizado = await prisma.agendamento.update({
                 where: { AgendamentoId: agendamentoId },
-                data: { AgendamentoStatus },
+                data: { AgendamentoStatus: AgendamentoStatus, AgendamentoDescricaoTrabalho: AgendamentoDescricaoTrabalho || null },
                 include: {
                     prestador: {
                         select: {
@@ -955,16 +1099,34 @@ class AgendamentoController {
                         where: { AgendamentoId: agendamentoId }
                     });
 
-                    // Adicionar novas relações
+                    // Adicionar novas relações com os preços atuais
                     await Promise.all(
-                        servicos.map(servicoId =>
-                            prisma.servicoAgendamento.create({
+                        servicos.map(async (servicoId) => {
+                            // Buscar o preço atual do serviço
+                            const servico = await prisma.servico.findUnique({
+                                where: { ServicoId: parseInt(servicoId) },
+                                include: {
+                                    precos: {
+                                        orderBy: {
+                                            ServicoPrecoDtCriacao: 'desc'
+                                        },
+                                        take: 1
+                                    }
+                                }
+                            });
+
+                            // Obter o preço atual (mais recente) ou 0 se não houver
+                            const precoAtual = servico?.precos?.[0]?.ServicoValor ?? 0;
+
+                            // Criar a relação com o preço registrado
+                            return prisma.servicoAgendamento.create({
                                 data: {
                                     AgendamentoId: agendamentoId,
-                                    ServicoId: parseInt(servicoId)
+                                    ServicoId: parseInt(servicoId),
+                                    ServicoValor: precoAtual
                                 }
-                            })
-                        )
+                            });
+                        })
                     );
                 }
 

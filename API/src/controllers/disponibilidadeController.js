@@ -388,7 +388,7 @@ class DisponibilidadeController {
 
             // CORREÇÃO 3: Formatar resposta para o frontend
             // O frontend espera uma lista de disponibilidades no formato do modelo
-            console.log('Disponibilidades formatadas:', disponibilidadesFormatadas);
+            //console.log('Disponibilidades formatadas:', disponibilidadesFormatadas);
             res.status(200).json({
                 success: true,
                 data: disponibilidadesFormatadas,
