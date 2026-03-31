@@ -23,15 +23,15 @@ class _ListaAgendamentosPrestadorScreenState
   String? _errorMessage;
 
   // Filtros
-  String _filtroStatus = 'TODOS';
+  String _filtroStatus = 'PENDENTE';
   final List<String> _statusOptions = [
-    'TODOS',
     'PENDENTE',
     'CONFIRMADO',
     'EM_ANDAMENTO',
     'CONCLUIDO',
     'CANCELADO',
     'RECUSADO',
+    'TODOS',
   ];
 
   // Adicione estas variáveis após as existentes
@@ -144,14 +144,30 @@ class _ListaAgendamentosPrestadorScreenState
 
       if (mounted) {
         if (result['success']) {
-          setState(() {
-            _agendamentos = result['data'];
-            _aplicarFiltro();
-            _isLoading = false;
+          List<AgendamentoPrestador> agendamentos = List.from(result['data']);
+
+          // LOG: Verificar dados antes da ordenação
+          //print('=== Dados ANTES da ordenação ===');
+          //for (var ag in agendamentos) {
+          //  print('Data: ${ag.dataServico} - Hora: ${ag.horaServico}');
+          //}
+
+          // Ordenar por data e hora (crescente)
+          agendamentos.sort((a, b) {
+            final dataComparacao = a.dataServico.compareTo(b.dataServico);
+            if (dataComparacao != 0) return dataComparacao;
+            return a.horaServico.compareTo(b.horaServico);
           });
-        } else {
+
+          // LOG: Verificar dados depois da ordenação
+          //print('=== Dados DEPOIS da ordenação ===');
+          //for (var ag in agendamentos) {
+          //  print('Data: ${ag.dataServico} - Hora: ${ag.horaServico}');
+          //}
+
           setState(() {
-            _errorMessage = result['message'];
+            _agendamentos = agendamentos;
+            _aplicarFiltro();
             _isLoading = false;
           });
         }
@@ -177,9 +193,9 @@ class _ListaAgendamentosPrestadorScreenState
       }
 
       // Ordenar por data (mais recentes primeiro)
-      _agendamentosFiltrados.sort(
-        (a, b) => b.dataServico.compareTo(a.dataServico),
-      );
+      // _agendamentosFiltrados.sort(
+      //   (a, b) => b.dataServico.compareTo(a.dataServico),
+      // );
     });
   }
 
@@ -456,7 +472,7 @@ class _ListaAgendamentosPrestadorScreenState
                 child: _buildResumoItem(
                   'Recusados',
                   _getCountPorStatus('RECUSADO').toString(),
-                  Icons.cancel,
+                  Icons.block_rounded,
                 ),
               ),
               Expanded(

@@ -122,6 +122,62 @@ class AgendamentoService {
     }
   }
 
+  // Listar todos agendamentos do cliente
+  Future<Map<String, dynamic>> listarMeusAgendamentosClienteTodos({
+    required String token,
+    DateTime? dataInicio,
+    DateTime? dataFim,
+    String? status,
+  }) async {
+    try {
+      String url =
+          '${ApiConfig.baseUrl}${ApiConfig.agendamentoEndpoint}/meus-agendamentos/todos';
+
+      final queryParams = <String, String>{};
+      if (dataInicio != null) {
+        queryParams['dataInicio'] =
+            '${dataInicio.year}-${dataInicio.month.toString().padLeft(2, '0')}-${dataInicio.day.toString().padLeft(2, '0')}';
+      }
+      if (dataFim != null) {
+        queryParams['dataFim'] =
+            '${dataFim.year}-${dataFim.month.toString().padLeft(2, '0')}-${dataFim.day.toString().padLeft(2, '0')}';
+      }
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+
+      if (queryParams.isNotEmpty) {
+        url += '?${Uri(queryParameters: queryParams).query}';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': responseData['data'] ?? [],
+          'total': responseData['total'] ?? 0,
+          'periodo': responseData['periodo'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao listar agendamentos',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
   // Buscar agendamento por ID
   Future<Map<String, dynamic>> buscarAgendamentoPorId({
     required int agendamentoId,

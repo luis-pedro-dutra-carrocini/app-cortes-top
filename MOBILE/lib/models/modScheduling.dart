@@ -12,6 +12,8 @@ class Agendamento {
   final Map<String, dynamic>? prestador;
   final Map<String, dynamic>? cliente;
   final List<dynamic>? servicos;
+  final String? endereco;
+  final Map<String, dynamic>? estabelecimento;
 
   Agendamento({
     required this.id,
@@ -27,6 +29,8 @@ class Agendamento {
     this.prestador,
     this.cliente,
     this.servicos,
+    this.endereco,
+    this.estabelecimento
   });
 
   factory Agendamento.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,8 @@ class Agendamento {
       prestador: json['prestador'],
       cliente: json['cliente'],
       servicos: json['servicos'],
+      endereco: json['endereco'],
+      estabelecimento: json['estabelecimento']
     );
   }
 

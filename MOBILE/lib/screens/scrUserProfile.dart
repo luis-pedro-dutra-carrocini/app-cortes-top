@@ -96,6 +96,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   bool _isEditing = false;
   bool _obscureSenha = true;
   bool _obscureConfirmarSenha = true;
+  // ignore: unused_field
   bool _confirmarExclusao = false;
 
   final UsuarioService _usuarioService = UsuarioService();

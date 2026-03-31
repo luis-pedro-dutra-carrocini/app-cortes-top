@@ -7,11 +7,17 @@ import '../providers/proUser.dart';
 import 'services/scrServiceList.dart';
 import '../services/serDashboard.dart';
 import '../services/serScheduling.dart';
+import '../services/serDashboardEmpresa.dart';
 import 'availability/scrAvailabilityList.dart';
 import 'scheduling/scrSchedulingNew.dart';
 import 'scheduling/scrSchedulingDetail.dart';
+import 'scheduling/scrHistoryScheduling.dart';
 import 'schedulingAttendant/scrSchedulingList.dart';
 import 'establishment/scrEstablishmentList.dart';
+import 'scrDashboard.dart';
+import 'scrMyLinks.dart';
+import 'scrSearch.dart';
+import 'enterprise/scrDashboard.dart';
 
 class HomeScreen extends StatefulWidget {
   final Usuario usuario;
@@ -29,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
 
   final DashboardService _dashboardService = DashboardService();
+  final DashboardEmpresaService _dashboardEmpresaService =
+      DashboardEmpresaService();
   Map<String, dynamic>? _resumoRapido;
   bool _carregandoResumo = true;
   bool _usuarioBloqueado = false;
@@ -42,12 +50,24 @@ class _HomeScreenState extends State<HomeScreen> {
     'Iniciar novo Agendamento': Icons.add_circle,
     'Meu Agendamento': Icons.event,
     'Gerenciar Estabelecimentos': Icons.storefront,
+    'Vinculos Estabelecimentos': Icons.storefront,
   };
 
   final AgendamentoService _agendamentoService =
       AgendamentoService(); // Você precisará criar este serviço
   List<dynamic> _agendamentosPendentes = [];
   bool _carregandoAgendamentos = false;
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'PENDENTE':
+        return const Color.fromARGB(255, 216, 130, 1);
+      case 'CONFIRMADO':
+        return const Color.fromARGB(255, 44, 100, 46);
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   void initState() {
@@ -64,6 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _carregarResumoRapido();
     } else if (_usuario.tipo == 'CLIENTE') {
       _carregarAgendamentosPendentes();
+    } else if (_usuario.tipo == 'EMPRESA') {
+      _carregarResumoRapidoEmpresa();
     }
   }
 
@@ -88,6 +110,33 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Erro ao carregar resumo: $e');
+      setState(() {
+        _carregandoResumo = false;
+      });
+    }
+  }
+
+  Future<void> _carregarResumoRapidoEmpresa() async {
+    if (_usuario.tipo != 'EMPRESA') return;
+
+    setState(() {
+      _carregandoResumo = true;
+    });
+
+    try {
+      final result = await _dashboardEmpresaService.obterResumoRapido(_token);
+      if (mounted && result['success']) {
+        setState(() {
+          _resumoRapido = result['data'];
+          _carregandoResumo = false;
+        });
+      } else {
+        setState(() {
+          _carregandoResumo = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar resumo da empresa: $e');
       setState(() {
         _carregandoResumo = false;
       });
@@ -120,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao carregar agendamentos: $e');
+      //print('Erro ao carregar agendamentos: $e');
       setState(() {
         _carregandoAgendamentos = false;
       });
@@ -179,7 +228,12 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NovoAgendamentoScreen()),
-      );
+      ).then((_) {
+        // Recarregar os agendamentos pendentes quando voltar da tela de agendamento
+        if (_usuario.tipo == 'CLIENTE') {
+          _carregarAgendamentosPendentes();
+        }
+      });
     } else if (opcao == 'Gerenciar Agendamentos') {
       Navigator.push(
         context,
@@ -193,6 +247,28 @@ class _HomeScreenState extends State<HomeScreen> {
         MaterialPageRoute(
           builder: (context) => const ListaEstabelecimentosScreen(),
         ),
+      );
+    } else if (opcao == 'Vinculos Estabelecimentos') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MeusVinculosScreen()),
+      );
+    } else if (opcao == 'Hitorico Agendamentos') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HistoricoAgendamentosScreen(),
+        ),
+      );
+    } else if (opcao == 'Pesquisar') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PesquisaScreen()),
+      );
+    } else if (opcao == 'Dashboard') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardEmpresaScreen()),
       );
     } else {
       // TODO: Implementar outras navegações
@@ -226,6 +302,10 @@ class _HomeScreenState extends State<HomeScreen> {
         'icone': _icons['Gerenciar Agendamentos'],
       },
       {'titulo': 'Gerenciar Serviços', 'icone': _icons['Gerenciar Serviços']},
+      {
+        'titulo': 'Vinculos Estabelecimentos',
+        'icone': _icons['Vinculos Estabelecimentos'],
+      },
       {'titulo': 'Gerenciar Conta', 'icone': _icons['Gerenciar Conta']},
     ];
   }
@@ -252,7 +332,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> _getOpcoesEmpresa() {
-    // Se estiver bloqueado, mostra apenas Gerenciar Conta
     if (_usuarioBloqueado) {
       return [
         {'titulo': 'Gerenciar Conta', 'icone': _icons['Gerenciar Conta']},
@@ -262,7 +341,11 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Map<String, dynamic>> opcoes = [];
 
     opcoes.addAll([
-      {'titulo': 'Gerenciar Estabelecimentos', 'icone': _icons['Gerenciar Estabelecimentos']},
+      {'titulo': 'Dashboard', 'icone': Icons.bar_chart},
+      {
+        'titulo': 'Gerenciar Estabelecimentos',
+        'icone': _icons['Gerenciar Estabelecimentos'],
+      },
       {'titulo': 'Gerenciar Conta', 'icone': _icons['Gerenciar Conta']},
     ]);
 
@@ -411,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: Text(
                                       isPrestador
                                           ? 'Prestador de Serviços'
-                                          : 'Cliente',
+                                          : isEmpresa ? 'Empresa' : 'Cliente',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 12,
@@ -710,7 +793,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SchedulingDetailScreen(
+            builder: (context) => DetalhesAgendamentoScreen(
               agendamentoId: agendamento['AgendamentoId'],
             ),
           ),
@@ -744,7 +827,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    agendamento['prestador']['UsuarioNome'] ?? 'Prestador',
+                    agendamento['estabelecimento'] != null &&
+                            agendamento['estabelecimento']['EstabelecimentoNome'] !=
+                                null
+                        ? agendamento['estabelecimento']['EstabelecimentoNome']
+                        : (agendamento['prestador']['UsuarioNome'] ??
+                              'Prestador'),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF4A5C6B),
@@ -800,7 +888,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 agendamento['AgendamentoStatus'] ?? 'PENDENTE',
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.orange.shade800,
+                  color: _getStatusColor(agendamento['AgendamentoStatus']),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -846,16 +934,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icons.calendar_today,
               ),
               _buildResumoItem(
-                'Disponível',
+                'Disponíveis',
                 _resumoRapido != null
-                    ? '${_resumoRapido!['horasDisponiveisHoje']?.toStringAsFixed(1) ?? '0'}h'
+                    ? '${_resumoRapido!['horasDisponiveisHoje'] ?? '0'}'
+                    : '0h',
+                Icons.access_time,
+              ),
+              _buildResumoItem(
+                'Reservadas',
+                _resumoRapido != null
+                    ? '${_resumoRapido!['horasReservadasHoje'] ?? '0'}'
                     : '0h',
                 Icons.access_time,
               ),
               _buildResumoItem(
                 'Faturamento',
                 _resumoRapido != null
-                    ? 'R\$ ${_resumoRapido!['faturamentoMes']?.toStringAsFixed(2) ?? '0'}'
+                    ? 'R\$ ${_resumoRapido!['faturamentoDia']?.toStringAsFixed(2) ?? '0'}'
                     : 'R\$ 0',
                 Icons.attach_money,
               ),
@@ -867,16 +962,22 @@ class _HomeScreenState extends State<HomeScreen> {
           // Botão "Ver mais detalhes"
           OutlinedButton.icon(
             onPressed: () {
-              // TODO: Navegar para tela de Dashboard completa
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Dashboard completo em breve!'),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DashboardScreen(),
                 ),
               );
+              // TODO: Navegar para tela de Dashboard completa
+              // ScaffoldMessenger.of(context).showSnackBar(
+              //   SnackBar(
+              //     content: const Text('Dashboard completo em breve!'),
+              //     behavior: SnackBarBehavior.floating,
+              //     shape: RoundedRectangleBorder(
+              //       borderRadius: BorderRadius.circular(10),
+              //     ),
+              //   ),
+              // );
             },
             icon: const Icon(Icons.bar_chart, size: 18),
             label: const Text('Ver mais detalhes'),
@@ -902,13 +1003,13 @@ class _HomeScreenState extends State<HomeScreen> {
           valor,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 16,
+            fontSize: 14,
             color: Color(0xFF4A5C6B),
           ),
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
         ),
       ],
     );
@@ -949,7 +1050,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Buscar - visível apenas para não prestadores
               if (!isPrestador && !isEmpresa)
-                _buildNavItem(Icons.search, 'Buscar', false),
+                _buildNavItem(
+                  Icons.search,
+                  'Buscar',
+                  false,
+                  onTap: () {
+                    _navegarPara('Pesquisar');
+                  },
+                ),
 
               // Novo - visível para todos
               if (!isPrestador && !isEmpresa)
@@ -957,7 +1065,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Histórico - visível apenas para não prestadores
               if (!isPrestador && !isEmpresa)
-                _buildNavItem(Icons.history, 'Histórico', false),
+                _buildNavItem(
+                  Icons.history,
+                  'Histórico',
+                  false,
+                  onTap: () {
+                    _navegarPara('Hitorico Agendamentos');
+                  },
+                ),
 
               // Perfil - sempre visível
               _buildNavItem(

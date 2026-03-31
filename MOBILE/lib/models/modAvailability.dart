@@ -1,6 +1,9 @@
 class Disponibilidade {
   final int id;
   final int prestadorId;
+  String? prestadorNome;
+  int? estabelecimentoId;
+  final String? estabelecimentoNome;
   final DateTime data;
   final String horaInicio;
   final String horaFim;
@@ -15,12 +18,18 @@ class Disponibilidade {
     required this.horaFim,
     required this.status,
     this.prestador,
+    this.estabelecimentoId,
+    this.estabelecimentoNome,
+    this.prestadorNome
   });
 
   factory Disponibilidade.fromJson(Map<String, dynamic> json) {
     return Disponibilidade(
       id: json['DisponibilidadeId'] ?? 0,
       prestadorId: json['PrestadorId'] ?? 0,
+      prestadorNome: json['prestador']?['UsuarioNome'] ?? 
+                     json['prestadorNome'] ?? 
+                     'Prestador não informado',
       data: json['DisponibilidadeData'] != null
           ? DateTime.parse(json['DisponibilidadeData'])
           : DateTime.now(),
@@ -28,6 +37,8 @@ class Disponibilidade {
       horaFim: json['DisponibilidadeHoraFim'] ?? '',
       status: json['DisponibilidadeStatus'] ?? true,
       prestador: json['prestador'],
+      estabelecimentoId: json['EstabelecimentoId'] ?? null,
+      estabelecimentoNome: json['estabelecimento']?['EstabelecimentoNome'] ?? null,
     );
   }
 
@@ -35,6 +46,7 @@ class Disponibilidade {
     return {
       'DisponibilidadeHoraInicio': horaInicio,
       'DisponibilidadeHoraFim': horaFim,
+      'EstabelecimentoId': estabelecimentoId,
     };
   }
 

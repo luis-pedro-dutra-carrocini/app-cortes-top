@@ -7,16 +7,16 @@ import '../../services/serAttendant.dart';
 import '../../providers/proUser.dart';
 import '../../models/modAvailability.dart';
 
-class SchedulingEditScreen extends StatefulWidget {
+class EditarAgendamentoScreen extends StatefulWidget {
   final Agendamento agendamento;
 
-  const SchedulingEditScreen({super.key, required this.agendamento});
+  const EditarAgendamentoScreen({super.key, required this.agendamento});
 
   @override
-  State<SchedulingEditScreen> createState() => _SchedulingEditScreenState();
+  State<EditarAgendamentoScreen> createState() => _SchedulingEditScreenState();
 }
 
-class _SchedulingEditScreenState extends State<SchedulingEditScreen> {
+class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
   late Agendamento _agendamento;
 
   // Controladores
@@ -87,10 +87,20 @@ class _SchedulingEditScreenState extends State<SchedulingEditScreen> {
 
       if (token == null) return;
 
-      final result = await _prestadorService.buscarServicosPrestador(
+      var result = await _prestadorService.buscarServicosPrestador(
         prestadorId: _agendamento.prestadorId,
         token: token,
       );
+
+      if (_agendamento.estabelecimento?['EstabelecimentoId'] != null) {
+        result = await _prestadorService
+            .buscarServicosPrestadorPorEstabelecimento(
+              estabelecimentoId:
+                  _agendamento.estabelecimento?['EstabelecimentoId'],
+              prestadorId: _agendamento.prestadorId,
+              token: token,
+            );
+      }
 
       if (mounted) {
         if (result['success']) {
@@ -672,7 +682,7 @@ class _SchedulingEditScreenState extends State<SchedulingEditScreen> {
                           );
                         }).toList(),
                       ),
-                      
+
                     const SizedBox(height: 20),
 
                     // Serviços

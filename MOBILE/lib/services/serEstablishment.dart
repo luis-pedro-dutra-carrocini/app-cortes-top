@@ -390,7 +390,7 @@ class EstabelecimentoService {
     }
   }
 
-  // Desativar vínculo (estabelecimento pode desativar)
+  // Desativar/Excluir vínculo (estabelecimento pode desativar/excluir)
   Future<Map<String, dynamic>> desativarVinculo({
     required int vinculoId,
     required String token,
@@ -406,12 +406,12 @@ class EstabelecimentoService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': responseData['message'] ?? 'Vínculo desativado',
+          'message': responseData['message'] ?? 'Vínculo excluído',
         };
       } else {
         return {
           'success': false,
-          'message': responseData['error'] ?? 'Erro ao desativar vínculo',
+          'message': responseData['error'] ?? 'Erro ao excluir vínculo',
         };
       }
     } catch (e) {
@@ -539,6 +539,401 @@ class EstabelecimentoService {
         return {
           'success': false,
           'message': responseData['error'] ?? 'Erro ao desvincular usuário',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Listar vínculos do prestador
+  Future<Map<String, dynamic>> listarVinculosPrestador({
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}estabelecimento/prestador/vinculos/todos',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao listar vínculos',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Reativar vínculo
+  Future<Map<String, dynamic>> reativarVinculo({
+    required int vinculoId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/vinculos/$vinculoId/reativar'),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Vínculo reativado com sucesso',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao reativar vínculo',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Listar serviços do estabelecimento
+  Future<Map<String, dynamic>> listarServicosEstabelecimento({
+    required int estabelecimentoId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/estabelecimento/$estabelecimentoId',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao listar serviços',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Cadastrar serviço do estabelecimento
+  Future<Map<String, dynamic>> cadastrarServicoEstabelecimento({
+    required int estabelecimentoId,
+    required String nome,
+    String? descricao,
+    required int tempoMedio,
+    required String token,
+  }) async {
+    try {
+      final body = {
+        'EstabelecimentoId': estabelecimentoId,
+        'ServicoNome': nome.trim(),
+        'ServicoDescricao': descricao?.trim().isEmpty ?? true
+            ? null
+            : descricao?.trim(),
+        'ServicoTempoMedio': tempoMedio,
+      };
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}servicoEstabelecimento'),
+        headers: _headers(token),
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': 'Serviço cadastrado com sucesso',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao cadastrar serviço',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Listar prestadores disponíveis para vincular a um serviço
+  Future<Map<String, dynamic>> listarPrestadoresDisponiveisParaServico({
+    required int servicoEstabelecimentoId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/$servicoEstabelecimentoId/prestadores-disponiveis',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao listar prestadores',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Listar prestadores vinculados a um serviço
+  Future<Map<String, dynamic>> listarPrestadoresVinculados({
+    required int servicoEstabelecimentoId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/$servicoEstabelecimentoId/prestadores-vinculados',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message':
+              responseData['error'] ?? 'Erro ao listar prestadores vinculados',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Vincular serviço a um prestador
+  Future<Map<String, dynamic>> vincularServicoAPrestador({
+    required int servicoEstabelecimentoId,
+    required int prestadorId,
+    double? valorInicial,
+    required String token,
+  }) async {
+    try {
+      final Map<String, dynamic> body = {};
+      if (valorInicial != null && valorInicial > 0) {
+        body['ServicoValor'] = valorInicial;
+      }
+
+      final response = await http.post(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/$servicoEstabelecimentoId/vincular/$prestadorId',
+        ),
+        headers: _headers(token),
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': 'Serviço vinculado com sucesso',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao vincular serviço',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Desvincular serviço de um prestador
+  Future<Map<String, dynamic>> desvincularServicoDePrestador({
+    required int servicoId, // ID do serviço vinculado (na tabela Servico)
+    required String token,
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/vincular/$servicoId',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': 'Serviço desvinculado com sucesso'};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao desvincular serviço',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Listar serviços do estabelecimento (todos)
+  Future<Map<String, dynamic>> listarTodosServicosEstabelecimento({
+    required int estabelecimentoId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoEstabelecimento/estabelecimento/$estabelecimentoId/todos',
+        ),
+        headers: _headers(token),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao listar serviços',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Atualizar serviço do estabelecimento
+  Future<Map<String, dynamic>> atualizarServicoEstabelecimento({
+    required int servicoId,
+    required String nome,
+    String? descricao,
+    required int tempoMedio,
+    required bool ativo,
+    required String token,
+  }) async {
+    try {
+      final body = {
+        'ServicoNome': nome.trim(),
+        'ServicoDescricao': descricao?.trim().isEmpty ?? true
+            ? null
+            : descricao?.trim(),
+        'ServicoTempoMedio': tempoMedio,
+        'ServicoAtivo': ativo,
+      };
+
+      final response = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}servicoEstabelecimento/$servicoId'),
+        headers: _headers(token),
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message':
+              responseData['message'] ?? 'Serviço atualizado com sucesso',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao atualizar serviço',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Atualizar preço unificado para todos os prestadores vinculados a um serviço do estabelecimento
+  Future<Map<String, dynamic>> atualizarPrecoUnificadoServico({
+    required int servicoEstabelecimentoId,
+    required double valor,
+    required String token,
+  }) async {
+    try {
+      final body = {'ServicoValor': valor};
+
+      final response = await http.post(
+        Uri.parse(
+          '${ApiConfig.baseUrl}servicoPreco/servico-estabelecimento/$servicoEstabelecimentoId/preco-unificado',
+        ),
+        headers: _headers(token),
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Preço atualizado com sucesso',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao atualizar preço',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // Adicionar preço a um serviço individual
+  Future<Map<String, dynamic>> adicionarPrecoServico({
+    required int servicoId,
+    required double valor,
+    required String token,
+  }) async {
+    try {
+      final body = {'ServicoValor': valor};
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}servicoPreco/servico/$servicoId'),
+        headers: _headers(token),
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': 'Preço adicionado com sucesso',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao adicionar preço',
         };
       }
     } catch (e) {

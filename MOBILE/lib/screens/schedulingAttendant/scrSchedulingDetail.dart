@@ -31,6 +31,8 @@ class _DetalheAgendamentoPrestadorScreenState
   void initState() {
     super.initState();
     _agendamento = widget.agendamento;
+    print('PAsou -----------------------------------------------------');
+    print(_agendamento.servicos);
     _agendamento.statusDescricao = _agendamento.status;
     if (_agendamento.statusDescricao == 'EM_ANDAMENTO') {
       _agendamento.statusDescricao = 'EM ATENDIMENTO';
@@ -578,7 +580,7 @@ class _DetalheAgendamentoPrestadorScreenState
                       ..._agendamento.servicos.asMap().entries.map((entry) {
                         final index = entry.key;
                         final item = entry.value;
-                        final servico = item['servico'] ?? item;
+                        final servicos = item['servicos'] ?? item;
                         final isLast =
                             index == _agendamento.servicos.length - 1;
 
@@ -612,15 +614,15 @@ class _DetalheAgendamentoPrestadorScreenState
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          servico['ServicoNome'] ?? 'Serviço',
+                                          servicos['servico']?['ServicoNome'] ?? 'Serviço',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w500,
                                             color: Color(0xFF4A5C6B),
                                           ),
                                         ),
-                                        if (servico['ServicoDescricao'] != null)
+                                        if (servicos['servico']?['ServicoDescricao'] != null)
                                           Text(
-                                            servico['ServicoDescricao'],
+                                            servicos['servico']?['ServicoDescricao'],
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Colors.grey.shade600,
@@ -635,14 +637,14 @@ class _DetalheAgendamentoPrestadorScreenState
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        'R\$ ${_getPrecoServico(servico)}',
+                                        'R\$ ${_getPrecoServico(servicos)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Color(0xFF4A5C6B),
                                         ),
                                       ),
                                       Text(
-                                        '${servico['ServicoTempoMedio'] ?? 0} min',
+                                        '${servicos['servico']?['ServicoTempoMedio'] ?? 0} min',
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: Colors.grey.shade600,
@@ -860,14 +862,8 @@ class _DetalheAgendamentoPrestadorScreenState
     );
   }
 
-  String _getPrecoServico(Map<String, dynamic> servico) {
-    if (servico['precoAtual'] != null) {
-      return servico['precoAtual'].toStringAsFixed(2);
-    }
-    if (servico['precos'] != null && servico['precos'].length > 0) {
-      return servico['precos'][0]['ServicoValor'].toStringAsFixed(2);
-    }
-    return '0.00';
+  String _getPrecoServico(Map<String, dynamic> servicos) {
+      return servicos['ServicoValor'].toStringAsFixed(2);
   }
 
   Widget _buildInfoSection({

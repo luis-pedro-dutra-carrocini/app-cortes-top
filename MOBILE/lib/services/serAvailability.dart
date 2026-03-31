@@ -4,6 +4,7 @@ import '../config/conApi.dart';
 import '../models/modAvailability.dart';
 
 class DisponibilidadeService {
+  
   // Listar disponibilidades do prestador
   Future<Map<String, dynamic>> listarMinhasDisponibilidades(
     int prestadorId,
@@ -95,6 +96,7 @@ class DisponibilidadeService {
     required DateTime data,
     required String horaInicio,
     required String horaFim,
+    int? estabelecimentoId
   }) async {
     try {
       final response = await http.post(
@@ -107,6 +109,7 @@ class DisponibilidadeService {
           'DisponibilidadeData': data.toIso8601String(),
           'DisponibilidadeHoraInicio': horaInicio,
           'DisponibilidadeHoraFim': horaFim,
+          'EstabelecimentoId': estabelecimentoId ?? null,
         }),
       );
 
@@ -136,15 +139,17 @@ class DisponibilidadeService {
   Future<Map<String, dynamic>> atualizarDisponibilidade({
     required int disponibilidadeId,
     required String token,
-    required DateTime data, // <-- Mudar de diaSemana para data
+    required DateTime data,
     required String horaInicio,
     required String horaFim,
+    int? estabelecimentoId,
   }) async {
     try {
       final Map<String, dynamic> body = {
         'DisponibilidadeData': data.toIso8601String(),
         'DisponibilidadeHoraInicio': horaInicio,
         'DisponibilidadeHoraFim': horaFim,
+        if (estabelecimentoId != null) 'EstabelecimentoId': estabelecimentoId,
       };
 
       final response = await http.put(
@@ -248,4 +253,33 @@ class DisponibilidadeService {
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
+
+  // Buscar estabelecimentos vinculados ao prestador
+  Future<Map<String, dynamic>> buscarEstabelecimentosVinculados(
+    String token,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}estabelecimento/prestador/vinculos/todos'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data'] ?? []};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao buscar estabelecimentos',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
 }

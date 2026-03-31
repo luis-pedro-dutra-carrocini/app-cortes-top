@@ -375,7 +375,6 @@ class _DetalhesServicoScreenState extends State<DetalhesServicoScreen> {
                           _servico.descricao!,
                           isMultiline: true,
                         ),
-                      _buildInfoRow('ID do Serviço:', '#${_servico.id}'),
                     ],
                   ),
 

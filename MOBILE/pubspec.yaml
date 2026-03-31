@@ -14,6 +14,7 @@ dependencies:
   provider: ^6.1.1  # Para gerenciamento de estado
   mask_text_input_formatter: ^2.9.0  # Para máscara de telefone
   shared_preferences: ^2.2.2 # Para armazenar dados localmente
+  fl_chart: ^0.68.0
   flutter_localizations:
     sdk: flutter
 

@@ -5,16 +5,16 @@ import '../../services/serScheduling.dart';
 import '../../providers/proUser.dart';
 import 'scrSchedulingEdit.dart';
 
-class SchedulingDetailScreen extends StatefulWidget {
+class DetalhesAgendamentoScreen extends StatefulWidget {
   final int agendamentoId;
 
-  const SchedulingDetailScreen({super.key, required this.agendamentoId});
+  const DetalhesAgendamentoScreen({super.key, required this.agendamentoId});
 
   @override
-  State<SchedulingDetailScreen> createState() => _SchedulingDetailScreenState();
+  State<DetalhesAgendamentoScreen> createState() => _SchedulingDetailScreenState();
 }
 
-class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
+class _SchedulingDetailScreenState extends State<DetalhesAgendamentoScreen> {
   Agendamento? _agendamento;
   bool _isLoading = true;
   String? _errorMessage;
@@ -202,25 +202,6 @@ class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
     );
   }
 
-  /*
-  String _getStatusColor() {
-    switch (_agendamento?.status) {
-      case 'PENDENTE':
-        return 'orange';
-      case 'CONFIRMADO':
-        return 'green';
-      case 'EM_ANDAMENTO':
-        return 'blue';
-      case 'CONCLUIDO':
-        return 'grey';
-      case 'CANCELADO':
-        return 'red';
-      default:
-        return 'grey';
-    }
-  }
-  */
-
   Color _getStatusColorValue() {
     switch (_agendamento?.status) {
       case 'PENDENTE':
@@ -316,6 +297,54 @@ class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
                     ),
                   ],
                 ),
+                if (_agendamento?.estabelecimento?['EstabelecimentoNome'] !=
+                    null) ...[
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Empresa:',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _agendamento?.estabelecimento?['empresa']?['EmpresaNome'] ??
+                              'Carregando...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Estabelecimento:',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _agendamento
+                                  ?.estabelecimento?['EstabelecimentoNome'] ??
+                              'Carregando...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 15),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -357,6 +386,11 @@ class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
                 icon: Icons.access_time,
                 label: 'Horário',
                 value: _agendamento?.horaServico ?? '',
+              ),
+              _buildInfoRow(
+                icon: Icons.location_city,
+                label: 'Endereço',
+                value: _agendamento?.endereco ?? '',
               ),
               if (_agendamento?.observacao != null &&
                   _agendamento!.observacao!.isNotEmpty)
@@ -534,7 +568,7 @@ class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              SchedulingEditScreen(agendamento: _agendamento!),
+                              EditarAgendamentoScreen(agendamento: _agendamento!),
                         ),
                       ).then((atualizado) {
                         if (atualizado == true) {
@@ -583,12 +617,22 @@ class _SchedulingDetailScreenState extends State<SchedulingDetailScreen> {
   }
 
   String _getPrecoServico(Map<String, dynamic> servico) {
+    // PRIORIDADE 1: Valor armazenado no momento do agendamento (campo valorNoMomento)
+    if (servico['valorNoMomento'] != null) {
+      return servico['valorNoMomento'].toStringAsFixed(2);
+    }
+
+    // PRIORIDADE 2: Se por algum motivo não tiver valorNoMomento, tenta o precoAtual
     if (servico['precoAtual'] != null) {
       return servico['precoAtual'].toStringAsFixed(2);
     }
+
+    // PRIORIDADE 3: Tenta buscar na lista de preços
     if (servico['precos'] != null && servico['precos'].length > 0) {
       return servico['precos'][0]['ServicoValor'].toStringAsFixed(2);
     }
+
+    // VALOR PADRÃO
     return '0.00';
   }
 

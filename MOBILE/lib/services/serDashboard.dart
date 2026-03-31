@@ -43,7 +43,7 @@ class DashboardService {
   }) async {
     try {
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/dashboard?tipo=$tipo'),
+        Uri.parse('${ApiConfig.baseUrl}dashboard?tipo=$tipo'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -70,4 +70,6 @@ class DashboardService {
       };
     }
   }
+
+
 }

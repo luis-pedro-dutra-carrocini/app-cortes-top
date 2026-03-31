@@ -6,9 +6,25 @@ import '../../models/modAvailability.dart';
 import '../../services/serAttendant.dart';
 import '../../services/serScheduling.dart';
 import '../../providers/proUser.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../config/conApi.dart';
 
 class NovoAgendamentoScreen extends StatefulWidget {
-  const NovoAgendamentoScreen({super.key});
+  final int? prestadorId;
+  final String? prestadorNome;
+  final int? estabelecimentoId;
+  final String? estabelecimentoNome;
+  final int? empresaId;
+
+  const NovoAgendamentoScreen({
+    super.key,
+    this.prestadorId,
+    this.prestadorNome,
+    this.estabelecimentoId,
+    this.estabelecimentoNome,
+    this.empresaId,
+  });
 
   @override
   State<NovoAgendamentoScreen> createState() => _NovoAgendamentoScreenState();
@@ -21,6 +37,17 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
   // Estados da tela
   int _currentStep = 0;
   bool _isLoading = false;
+
+  // Etapa 0: Seleção de Empresa e Estabelecimento
+  bool _usandoEstabelecimento = false;
+  List<dynamic> _empresas = [];
+  List<dynamic> _estabelecimentos = [];
+  dynamic _empresaSelecionada;
+  dynamic _estabelecimentoSelecionado;
+  bool _carregandoEmpresas = false;
+  bool _carregandoEstabelecimentos = false;
+  final TextEditingController _pesquisaEmpresaController =
+      TextEditingController();
 
   // Etapa 1: Seleção de Prestador
   List<Prestador> _ultimosPrestadores = [];
@@ -44,10 +71,56 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
   // Etapa 4: Observação
   final TextEditingController _observacaoController = TextEditingController();
 
+  List<dynamic> _ultimasEmpresas = [];
+
   @override
   void initState() {
     super.initState();
     _carregarUltimosPrestadores();
+    _carregarUltimasEmpresas();
+
+    // Processar parâmetros de navegação
+    if (widget.prestadorId != null) {
+      // Criar um prestador a partir dos parâmetros
+      _prestadorSelecionado = Prestador(
+        id: widget.prestadorId!,
+        nome: widget.prestadorNome ?? '',
+        telefone: '',
+        email: '',
+        tipo: 'PRESTADOR',
+      );
+      _usandoEstabelecimento = false;
+      _currentStep = 1; // Avançar para o passo de serviços
+      _carregarServicosPrestador();
+      _carregarHorariosDisponiveis();
+    } else if (widget.estabelecimentoId != null) {
+      _usandoEstabelecimento = true;
+      _estabelecimentoSelecionado = {
+        'id': widget.estabelecimentoId,
+        'nome': widget.estabelecimentoNome,
+      };
+      if (widget.empresaId != null) {
+        _empresaSelecionada = {'id': widget.empresaId, 'nome': ''};
+      }
+      _currentStep = 1; // Avançar para o passo de prestadores
+      _carregarPrestadoresVinculados();
+    }
+  }
+
+  // Quando mudar o estabelecimento selecionado, atualize a lista
+  void _onEstabelecimentoSelecionado(dynamic estabelecimento) {
+    setState(() {
+      _estabelecimentoSelecionado = estabelecimento;
+      _prestadorSelecionado = null;
+    });
+
+    if (_usandoEstabelecimento) {
+      _carregarPrestadoresVinculados(); // Carrega prestadores do estabelecimento
+    } else {
+      _carregarUltimosPrestadores(); // Carrega prestadores gerais
+    }
+
+    _currentStep = 1; // Avançar para próximo passo
   }
 
   bool _isPhoneNumber(String text) {
@@ -96,6 +169,28 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
     }
   }
 
+  Future<void> _carregarUltimasEmpresas() async {
+    try {
+      final usuarioProvider = Provider.of<UsuarioProvider>(
+        context,
+        listen: false,
+      );
+      final token = usuarioProvider.token;
+
+      if (token == null) return;
+
+      final result = await _prestadorService.buscarUltimasEmpresas(token);
+
+      if (mounted && result['success']) {
+        setState(() {
+          _ultimasEmpresas = result['data'] ?? [];
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar últimas empresas: $e');
+    }
+  }
+
   Future<void> _pesquisarPrestadores() async {
     if (_pesquisaController.text.isEmpty) {
       setState(() {
@@ -108,7 +203,6 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
     setState(() {
       _pesquisando = true;
       _isLoading = true;
-      _resultadosPesquisa = []; // <-- LIMPAR resultados anteriores
     });
 
     try {
@@ -117,43 +211,71 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         listen: false,
       );
       final token = usuarioProvider.token;
-
       if (token == null) return;
 
-      final result = await _prestadorService.pesquisarPrestadores(
-        token: token,
-        nome: _isPhoneNumber(_pesquisaController.text)
-            ? null
-            : _pesquisaController.text,
-        telefone: _isPhoneNumber(_pesquisaController.text)
-            ? _pesquisaController.text
-            : null,
-      );
+      final isPhone = _isPhoneNumber(_pesquisaController.text);
+      Map<String, dynamic> result;
 
-      if (mounted) {
-        if (result['success']) {
+      if (_usandoEstabelecimento && _estabelecimentoSelecionado != null) {
+        // Rota específica para prestadores por estabelecimento
+        result = await _prestadorService.pesquisarPrestadoresPorEstabelecimento(
+          token: token,
+          estabelecimentoId: _estabelecimentoSelecionado!['id'],
+          nome: isPhone ? null : _pesquisaController.text,
+          telefone: isPhone ? _pesquisaController.text : null,
+        );
+
+        if (mounted && result['success']) {
+          // CONVERSÃO: Os dados vêm como List<dynamic> de mapas simples
+          List<Prestador> prestadores = [];
+          if (result['data'] != null) {
+            prestadores = (result['data'] as List)
+                .map(
+                  (item) => Prestador.fromJson({
+                    'UsuarioId': item['id'],
+                    'UsuarioNome': item['nome'],
+                    'UsuarioTelefone': item['telefone'],
+                    'UsuarioEmail': item['email'] ?? '',
+                  }),
+                )
+                .toList();
+          }
           setState(() {
-            _resultadosPesquisa = result['data'];
+            _resultadosPesquisa = prestadores;
             _isLoading = false;
-            // _pesquisando continua true enquanto mostra resultados
           });
-        } else {
+        }
+      } else {
+        // Rota geral de prestadores (já retorna no formato correto)
+        result = await _prestadorService.pesquisarPrestadores(
+          token: token,
+          nome: isPhone ? null : _pesquisaController.text,
+          telefone: isPhone ? _pesquisaController.text : null,
+        );
+
+        if (mounted && result['success']) {
           setState(() {
+            _resultadosPesquisa = result['data'] ?? [];
             _isLoading = false;
-            _pesquisando =
-                false; // <-- Importante: desativar modo pesquisa em caso de erro
           });
-          _mostrarSnackBar(result['message'], Colors.red);
         }
       }
-    } catch (e) {
-      if (mounted) {
+
+      // Tratamento de erro comum para ambos os casos
+      if (mounted && !result['success']) {
         setState(() {
+          _resultadosPesquisa = [];
           _isLoading = false;
-          _pesquisando = false; // <-- Desativar modo pesquisa em caso de erro
+          _pesquisando = false;
         });
-        _mostrarSnackBar('Erro: $e', Colors.red);
+        _mostrarSnackBar(result['message'], Colors.red);
       }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _pesquisando = false;
+      });
+      _mostrarSnackBar('Erro na pesquisa: $e', Colors.red);
     }
   }
 
@@ -171,30 +293,35 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         listen: false,
       );
       final token = usuarioProvider.token;
-
       if (token == null) return;
 
-      final result = await _prestadorService.buscarServicosPrestador(
-        prestadorId: _prestadorSelecionado!.id,
-        token: token,
-      );
+      Map<String, dynamic> result;
+
+      if (_usandoEstabelecimento && _estabelecimentoSelecionado != null) {
+        // Serviços do prestador vinculados ao estabelecimento
+        result = await _prestadorService
+            .buscarServicosPrestadorPorEstabelecimento(
+              prestadorId: _prestadorSelecionado!.id,
+              estabelecimentoId: _estabelecimentoSelecionado!['id'],
+              token: token,
+            );
+      } else {
+        // Serviços gerais do prestador
+        result = await _prestadorService.buscarServicosPrestador(
+          prestadorId: _prestadorSelecionado!.id,
+          token: token,
+        );
+      }
 
       if (mounted) {
-        if (result['success']) {
-          setState(() {
-            _servicosDisponiveis = result['data'];
-            _carregandoServicos = false;
-          });
-        } else {
-          setState(() => _carregandoServicos = false);
-          _mostrarSnackBar(result['message'], Colors.red);
-        }
+        setState(() {
+          _servicosDisponiveis = result['data'] ?? [];
+          _carregandoServicos = false;
+        });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _carregandoServicos = false);
-        _mostrarSnackBar('Erro: $e', Colors.red);
-      }
+      setState(() => _carregandoServicos = false);
+      _mostrarSnackBar('Erro ao carregar serviços: $e', Colors.red);
     }
   }
 
@@ -214,20 +341,29 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         listen: false,
       );
       final token = usuarioProvider.token;
-
       if (token == null) return;
 
-      final result = await _prestadorService.buscarDisponibilidadesPrestador(
-        prestadorId: _prestadorSelecionado!.id,
-        token: token,
-        data: _dataSelecionada,
-      );
+      Map<String, dynamic> result;
+
+      if (_usandoEstabelecimento && _estabelecimentoSelecionado != null) {
+        result = await _prestadorService
+            .buscarDisponibilidadesPorEstabelecimento(
+              prestadorId: _prestadorSelecionado!.id,
+              estabelecimentoId: _estabelecimentoSelecionado!['id'],
+              token: token,
+              data: _dataSelecionada,
+            );
+      } else {
+        result = await _prestadorService.buscarDisponibilidadesPrestador(
+          prestadorId: _prestadorSelecionado!.id,
+          token: token,
+          data: _dataSelecionada,
+        );
+      }
 
       if (mounted) {
         if (result['success']) {
           final disponibilidades = result['data'] as List<Disponibilidade>;
-
-          // Extrair horários disponíveis com ID
           final horarios = disponibilidades
               .where((disp) => disp.status)
               .map((disp) => {'id': disp.id, 'hora': disp.horaInicio})
@@ -238,19 +374,13 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
             _carregandoHorarios = false;
           });
         } else {
-          setState(() {
-            _carregandoHorarios = false;
-          });
+          setState(() => _carregandoHorarios = false);
           _mostrarSnackBar(result['message'], Colors.red);
         }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _carregandoHorarios = false;
-        });
-        _mostrarSnackBar('Erro ao carregar horários: $e', Colors.red);
-      }
+      setState(() => _carregandoHorarios = false);
+      _mostrarSnackBar('Erro ao carregar horários: $e', Colors.red);
     }
   }
 
@@ -275,6 +405,132 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         _dataSelecionada = picked;
       });
       _carregarHorariosDisponiveis();
+    }
+  }
+
+  Future<void> _carregarEmpresas(String busca) async {
+    if (busca.isEmpty) return;
+
+    setState(() => _carregandoEmpresas = true);
+
+    try {
+      final usuarioProvider = Provider.of<UsuarioProvider>(
+        context,
+        listen: false,
+      );
+      final token = usuarioProvider.token;
+      if (token == null) return;
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}empresa/busca?q=$busca'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        setState(() {
+          _empresas = jsonResponse['data'] ?? [];
+          _carregandoEmpresas = false;
+        });
+      } else {
+        setState(() => _carregandoEmpresas = false);
+        _mostrarSnackBar('Erro ao buscar empresas', Colors.red);
+      }
+    } catch (e) {
+      setState(() => _carregandoEmpresas = false);
+      _mostrarSnackBar('Erro de conexão: $e', Colors.red);
+    }
+  }
+
+  Future<void> _carregarEstabelecimentos(int empresaId) async {
+    setState(() => _carregandoEstabelecimentos = true);
+
+    try {
+      final usuarioProvider = Provider.of<UsuarioProvider>(
+        context,
+        listen: false,
+      );
+      final token = usuarioProvider.token;
+      if (token == null) return;
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}empresa/$empresaId/estabelecimentos'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        setState(() {
+          _estabelecimentos = jsonResponse['data'] ?? [];
+          _carregandoEstabelecimentos = false;
+        });
+      } else {
+        setState(() => _carregandoEstabelecimentos = false);
+        _mostrarSnackBar('Erro ao buscar estabelecimentos', Colors.red);
+      }
+    } catch (e) {
+      setState(() => _carregandoEstabelecimentos = false);
+      _mostrarSnackBar('Erro de conexão: $e', Colors.red);
+    }
+  }
+
+  Future<void> _carregarPrestadoresVinculados() async {
+    if (!_usandoEstabelecimento || _estabelecimentoSelecionado == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final usuarioProvider = Provider.of<UsuarioProvider>(
+        context,
+        listen: false,
+      );
+      final token = usuarioProvider.token;
+      if (token == null) return;
+
+      // Buscar prestadores vinculados ao estabelecimento (sem filtro de busca)
+      final result = await _prestadorService
+          .pesquisarPrestadoresPorEstabelecimento(
+            token: token,
+            estabelecimentoId: _estabelecimentoSelecionado!['id'],
+            nome: null,
+            telefone: null,
+          );
+
+      if (mounted) {
+        if (result['success']) {
+          List<Prestador> prestadores = [];
+          if (result['data'] != null) {
+            prestadores = (result['data'] as List)
+                .map(
+                  (item) => Prestador.fromJson({
+                    'UsuarioId': item['id'],
+                    'UsuarioNome': item['nome'],
+                    'UsuarioTelefone': item['telefone'],
+                    'UsuarioEmail': item['email'] ?? '',
+                  }),
+                )
+                .toList();
+          }
+          setState(() {
+            _ultimosPrestadores = prestadores;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _ultimosPrestadores = [];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _mostrarSnackBar('Erro ao carregar prestadores: $e', Colors.red);
     }
   }
 
@@ -441,24 +697,55 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                 currentStep: _currentStep,
                 type: StepperType.vertical,
                 onStepContinue: () {
-                  if (_currentStep == 0 && _prestadorSelecionado == null) {
-                    _mostrarSnackBar('Selecione um prestador', Colors.orange);
-                    return;
-                  }
-                  if (_currentStep == 1 && _servicosSelecionados.isEmpty) {
-                    _mostrarSnackBar(
-                      'Selecione pelo menos um serviço',
-                      Colors.orange,
-                    );
-                    return;
-                  }
-                  if (_currentStep == 2 && _horaSelecionada == null) {
-                    _mostrarSnackBar('Selecione um horário', Colors.orange);
-                    return;
-                  }
-                  if (_currentStep < 3) {
+                  // PASSO 0: Tipo de busca
+                  if (_currentStep == 0) {
+                    if (_usandoEstabelecimento &&
+                        _estabelecimentoSelecionado == null) {
+                      _mostrarSnackBar(
+                        'Selecione um estabelecimento ou escolha agendamento direto',
+                        Colors.orange,
+                      );
+                      return;
+                    }
                     setState(() => _currentStep++);
-                  } else {
+                    return; // <-- IMPORTANTE: adicionar return para não continuar a execução
+                  }
+
+                  // PASSO 1: Prestador
+                  if (_currentStep == 1) {
+                    if (_prestadorSelecionado == null) {
+                      _mostrarSnackBar('Selecione um prestador', Colors.orange);
+                      return;
+                    }
+                    setState(() => _currentStep++);
+                    return;
+                  }
+
+                  // PASSO 2: Serviços
+                  if (_currentStep == 2) {
+                    if (_servicosSelecionados.isEmpty) {
+                      _mostrarSnackBar(
+                        'Selecione pelo menos um serviço',
+                        Colors.orange,
+                      );
+                      return;
+                    }
+                    setState(() => _currentStep++);
+                    return;
+                  }
+
+                  // PASSO 3: Horário
+                  if (_currentStep == 3) {
+                    if (_horaSelecionada == null) {
+                      _mostrarSnackBar('Selecione um horário', Colors.orange);
+                      return;
+                    }
+                    setState(() => _currentStep++);
+                    return;
+                  }
+
+                  // PASSO 4: Finalizar
+                  if (_currentStep == 4) {
                     _finalizarAgendamento();
                   }
                 },
@@ -470,13 +757,32 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                   }
                 },
                 steps: [
+                  // Passo 0: Escolha do tipo de agendamento
+                  Step(
+                    title: const Text('Tipo de Busca'),
+                    subtitle:
+                        _usandoEstabelecimento &&
+                            _estabelecimentoSelecionado != null
+                        ? Text(
+                            '${_empresaSelecionada?['nome']} - ${_estabelecimentoSelecionado!['nome']}',
+                          )
+                        : _usandoEstabelecimento
+                        ? Text('Selecionando empresa...')
+                        : Text('Agendamento direto'),
+                    isActive: _currentStep >= 0,
+                    state: _currentStep > 0
+                        ? StepState.complete
+                        : StepState.indexed,
+                    content: _buildPassoInicial(),
+                  ),
+                  // Passo 1: Prestador (ajustado)
                   Step(
                     title: const Text('Escolha o Prestador'),
                     subtitle: _prestadorSelecionado != null
                         ? Text(_prestadorSelecionado!.nome)
                         : null,
-                    isActive: _currentStep >= 0,
-                    state: _currentStep > 0
+                    isActive: _currentStep >= 1,
+                    state: _currentStep > 1
                         ? StepState.complete
                         : StepState.indexed,
                     content: _buildPassoPrestador(),
@@ -488,12 +794,10 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                             '${_servicosSelecionados.length} serviço(s) selecionado(s)',
                           )
                         : null,
-                    isActive: _currentStep >= 1,
-                    state: _currentStep > 1
+                    isActive: _currentStep >= 2,
+                    state: _currentStep > 2
                         ? StepState.complete
-                        : (_currentStep == 1
-                              ? StepState.editing
-                              : StepState.indexed),
+                        : StepState.indexed,
                     content: _buildPassoServicos(),
                   ),
                   Step(
@@ -503,12 +807,10 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                             '${_dataSelecionada.day}/${_dataSelecionada.month} às $_horaSelecionada',
                           )
                         : null,
-                    isActive: _currentStep >= 2,
-                    state: _currentStep > 2
+                    isActive: _currentStep >= 3,
+                    state: _currentStep > 3
                         ? StepState.complete
-                        : (_currentStep == 2
-                              ? StepState.editing
-                              : StepState.indexed),
+                        : StepState.indexed,
                     content: _buildPassoHorario(),
                   ),
                   Step(
@@ -516,12 +818,10 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                     subtitle: _observacaoController.text.isNotEmpty
                         ? Text(_observacaoController.text)
                         : null,
-                    isActive: _currentStep >= 3,
-                    state: _currentStep > 3
+                    isActive: _currentStep >= 4,
+                    state: _currentStep > 4
                         ? StepState.complete
-                        : (_currentStep == 3
-                              ? StepState.editing
-                              : StepState.indexed),
+                        : StepState.indexed,
                     content: _buildPassoObservacao(),
                   ),
                 ],
@@ -557,7 +857,7 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
                               ),
                             ),
                             child: Text(
-                              _currentStep == 3 ? 'Finalizar' : 'Continuar',
+                              _currentStep == 4 ? 'Finalizar' : 'Continuar',
                             ),
                           ),
                         ),
@@ -579,36 +879,19 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
           margin: const EdgeInsets.only(bottom: 16),
           child: TextFormField(
             controller: _pesquisaController,
+            onChanged: (value) {
+              // Força a rebuild do widget para atualizar o ícone
+              setState(() {});
+            },
             decoration: InputDecoration(
               hintText: 'Pesquisar nome ou telefone...',
-              prefixIcon: const Icon(Icons.search, color: Color(0xFF4A5C6B)),
+              // Só mostra o botão de pesquisa se houver texto
               suffixIcon: _pesquisaController.text.isNotEmpty
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Botão de busca (aparece quando há texto)
-                        IconButton(
-                          icon: const Icon(
-                            Icons.search,
-                            size: 18,
-                            color: Color(0xFF4A5C6B),
-                          ),
-                          onPressed: _pesquisarPrestadores,
-                        ),
-                        // Botão de limpar
-                        IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _pesquisaController.clear();
-                            setState(() {
-                              _resultadosPesquisa = [];
-                              _pesquisando = false;
-                            });
-                          },
-                        ),
-                      ],
+                  ? IconButton(
+                      icon: const Icon(Icons.search, color: Color(0xFF4A5C6B)),
+                      onPressed: _pesquisarPrestadores,
                     )
-                  : null,
+                  : null, // Nada quando não há texto
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey.shade300),
@@ -1042,6 +1325,273 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         filled: true,
         fillColor: const Color(0xFFF5F7FA),
       ),
+    );
+  }
+
+  //(removido-limpeza)
+  /*
+  Widget _buildPassoEmpresaEstabelecimento() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Escolha a Empresa',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4A5C6B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Campo de busca de empresa
+        TextFormField(
+          controller: _pesquisaEmpresaController,
+          decoration: InputDecoration(
+            hintText: 'Digite nome da empresa...',
+            prefixIcon: const Icon(Icons.business, color: Color(0xFF4A5C6B)),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                if (_pesquisaEmpresaController.text.isNotEmpty) {
+                  _carregarEmpresas(_pesquisaEmpresaController.text);
+                }
+              },
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (_carregandoEmpresas)
+          const Center(
+            child: CircularProgressIndicator(color: Color(0xFF4A5C6B)),
+          )
+        else if (_empresas.isNotEmpty)
+          ..._empresas.map((empresa) => _buildEmpresaTile(empresa)).toList(),
+
+        if (_empresaSelecionada != null) ...[
+          const Divider(height: 32),
+          const Text(
+            'Escolha o Estabelecimento',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4A5C6B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_carregandoEstabelecimentos)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF4A5C6B)),
+            )
+          else if (_estabelecimentos.isNotEmpty)
+            ..._estabelecimentos
+                .map((est) => _buildEstabelecimentoTile(est))
+                .toList(),
+        ],
+      ],
+    );
+  }
+  */
+
+  Widget _buildEmpresaTile(dynamic empresa) {
+    return ListTile(
+      leading: const Icon(Icons.business, color: Color(0xFF4A5C6B)),
+      title: Text(empresa['nome']),
+      subtitle: Text(empresa['telefone'] ?? ''),
+      onTap: () {
+        setState(() {
+          _empresaSelecionada = empresa;
+          _estabelecimentoSelecionado = null;
+          _prestadorSelecionado = null;
+        });
+        _carregarEstabelecimentos(empresa['id']);
+      },
+      selected: _empresaSelecionada?['id'] == empresa['id'],
+    );
+  }
+
+  Widget _buildEstabelecimentoTile(dynamic estabelecimento) {
+    return ListTile(
+      leading: const Icon(Icons.store, color: Color(0xFF4A5C6B)),
+      title: Text(estabelecimento['nome']),
+      subtitle: Text(
+        '${estabelecimento['endereco']?['rua']}, N° ${estabelecimento['endereco']?['numero']} ${estabelecimento['endereco']?['bairro']}, ${estabelecimento['endereco']?['cidade']} - ${estabelecimento['endereco']?['estado']}',
+      ),
+      onTap: () => _onEstabelecimentoSelecionado(estabelecimento),
+      selected: _estabelecimentoSelecionado?['id'] == estabelecimento['id'],
+    );
+  }
+
+  Widget _buildPassoInicial() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Opção 1: Agendamento direto com prestador
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton.icon(
+            // Mudar para ElevatedButton
+            onPressed: () {
+              setState(() {
+                _usandoEstabelecimento = false;
+                _empresaSelecionada = null;
+                _estabelecimentoSelecionado = null;
+              });
+              _carregarUltimosPrestadores(); // Recarrega prestadores gerais
+            },
+            icon: Icon(
+              Icons.person,
+              color: !_usandoEstabelecimento
+                  ? Colors.white
+                  : Color(0xFF4A5C6B), // Cor do ícone muda conforme seleção
+            ),
+            label: Text(
+              'Buscar por prestador',
+              style: TextStyle(
+                color: !_usandoEstabelecimento
+                    ? Colors.white
+                    : Color(0xFF4A5C6B),
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              backgroundColor: !_usandoEstabelecimento
+                  ? const Color(0xFF4A5C6B) // Cor de fundo quando selecionado
+                  : Colors.white, // Cor de fundo quando não selecionado
+              foregroundColor: !_usandoEstabelecimento
+                  ? Colors.white
+                  : const Color(0xFF4A5C6B),
+              side: BorderSide(
+                color: const Color(0xFF4A5C6B),
+                width: !_usandoEstabelecimento
+                    ? 0
+                    : 1, // Borda mais fina quando selecionado
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+
+        // Separador
+        const Row(
+          children: [
+            Expanded(child: Divider()),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text('ou', style: TextStyle(color: Colors.grey)),
+            ),
+            Expanded(child: Divider()),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Opção 2: Agendar via empresa/estabelecimento
+        ElevatedButton.icon(
+          // Também ElevatedButton
+          onPressed: () {
+            setState(() {
+              _usandoEstabelecimento = true;
+            });
+          },
+          icon: Icon(
+            Icons.business,
+            color: _usandoEstabelecimento ? Colors.white : Color(0xFF4A5C6B),
+          ),
+          label: Text(
+            'Buscar por empresa',
+            style: TextStyle(
+              color: _usandoEstabelecimento ? Colors.white : Color(0xFF4A5C6B),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            backgroundColor: _usandoEstabelecimento
+                ? const Color(0xFF4A5C6B)
+                : Colors.white,
+            foregroundColor: _usandoEstabelecimento
+                ? Colors.white
+                : const Color(0xFF4A5C6B),
+            side: BorderSide(
+              color: const Color(0xFF4A5C6B),
+              width: _usandoEstabelecimento ? 0 : 1,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+
+        // Se escolheu via empresa, mostrar campos de seleção
+        if (_usandoEstabelecimento) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'Escolha a Empresa',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4A5C6B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _pesquisaEmpresaController,
+            decoration: InputDecoration(
+              hintText: 'Pesquisar nome ou telefone...',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () =>
+                    _carregarEmpresas(_pesquisaEmpresaController.text),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_carregandoEmpresas)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF4A5C6B)),
+            )
+          else if (_empresas.isNotEmpty)
+            ..._empresas.map((empresa) => _buildEmpresaTile(empresa)).toList(),
+
+          if (_ultimasEmpresas.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Últimas empresas:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A5C6B),
+                ),
+              ),
+            ),
+            ..._ultimasEmpresas.map((empresa) => _buildEmpresaTile(empresa)),
+          ],
+
+          if (_empresaSelecionada != null) ...[
+            const Divider(height: 32),
+            const Text(
+              'Escolha o Estabelecimento',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A5C6B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_carregandoEstabelecimentos)
+              const Center(
+                child: CircularProgressIndicator(color: Color(0xFF4A5C6B)),
+              )
+            else if (_estabelecimentos.isNotEmpty)
+              ..._estabelecimentos
+                  .map((est) => _buildEstabelecimentoTile(est))
+                  .toList(),
+          ],
+        ],
+      ],
     );
   }
 }
