@@ -1,0 +1,277 @@
+// Configuração básica
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum para distinguir tipos de usuários
+enum UserType {
+  CLIENTE
+  PRESTADOR
+}
+
+// Enum para status do agendamento
+enum AppointmentStatus {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  CONCLUIDO
+  EM_ANDAMENTO
+  RECUSADO
+}
+
+enum NotificationStatus {
+  ENVIADO
+  EXIBIDO
+  LIDO
+}
+
+enum UsuEmpRelacao {
+  USUARIO
+  EMPRESA
+}
+
+enum UsuEstRelacao {
+  USUARIO
+  ESTABELECIMENTO
+}
+
+enum EmpresaStatus {
+  ATIVA
+  EXCLUIDA
+  BLOQUEADAPAGAMENTO
+  BLOQUEADA
+}
+
+enum UsuarioStatus {
+  ATIVO
+  EXCLUIDO
+  BLOQUEADOPAGAMENTO
+  BLOQUEADO
+}
+
+enum EstabelecimentoStatus {
+  ATIVO
+  EXCLUIDO
+  INATIVO
+  BLOQUEADO
+}
+
+enum UsuarioEstabelecimentoStatus {
+  ATIVO           // Ativado
+  SOLICITADOEST   // Estabelecimento solicitou vinculo
+  SOLICITADOPRE   // Prestador solicitou vinculo
+  RECUSADOEST     // Estabelecimento recusou vinculo
+  RECUSADOPRE     // Prestador recusou vinculo
+  INATIVO         // Inativado pelo estabelecimento/empresa
+  EXCLUIDO        // Excluido pelo estabelecimento/empresa ou pelo prestador
+  BLOQUEADO       // Boqueado pelo sistema (falta de pagamento, etc)
+}
+
+enum LogTipoRelacao {
+  USUARIO
+  EMPRESA
+  SISTEMA
+  OUTRO
+}
+
+
+model Administrador {
+  AdministradorId          Int      @id @default(autoincrement())
+  AdministradorNome        String   @unique @db.VarChar(100)
+  AdministradorUsuario     String   @db.VarChar(20)
+  AdministradorSenha       String
+  AdministradorUltimoLogin DateTime?
+}
+
+model Empresa {
+  EmpresaId           Int      @id @default(autoincrement())
+  EmpresaNome         String   @db.VarChar(100)
+  EmpresaCNPJ         String   @db.VarChar(20)
+  EmpresaLogo         String?  @db.VarChar(255) // URL ou caminho para o logo da empresa
+  EmpresaDescricao    String?
+  EmpresaStatus       EmpresaStatus @default(ATIVA)
+  EmpresaDtCriacao    DateTime @default(now())
+  EmpresaTelefone     String   @db.VarChar(15)
+  EmpresaEmail        String   @db.VarChar(256)
+  EmpresaSenha        String
+  EmpresaUltimoLogin  DateTime?
+
+  // Relações
+  estabelecimentos Estabelecimento[]
+}
+
+model Estabelecimento {
+  EstabelecimentoId        Int      @id @default(autoincrement())
+  EmpresaId                Int      // Referente a tabela Empresa
+  EstabelecimentoNome      String   @db.VarChar(100)
+  EstabelecimentoEndereco  Int      // Referente a tabela Endereco (Sem relacionamento direto, pois um edereço pode ser de um usuário ou de um estabelecimento)
+  EstabelecimentoTelefone  String   @db.VarChar(15)
+  EstabelecimentoStatus    EstabelecimentoStatus @default(ATIVO)
+  EstabelecimentoDtCriacao DateTime @default(now())
+
+  // Relações
+  empresa          Empresa        @relation(fields: [EmpresaId], references: [EmpresaId])
+  servicos         ServicoEstabelecimento[]
+  precos           ServicoPreco[]
+  agendamentos     Agendamento[]
+  usuarios         UsuarioEstabelecimento[]
+  disponibilidades Disponibilidade[]
+}
+
+model Usuario {
+  UsuarioId         Int      @id @default(autoincrement())
+  UsuarioNome       String   @db.VarChar(100)
+  UsuarioTelefone   String   @db.VarChar(15)
+  UsuarioEmail      String   @db.VarChar(256)
+  UsuarioSenha      String
+  UsuarioTipo       UserType @default(CLIENTE)
+  UsuarioDtCriacao  DateTime @default(now())  
+  UsuarioStatus     UsuarioStatus @default(ATIVO)
+  UsuarioUltimoLogin DateTime?
+  UsuarioEnderecoId Int?    // Referente a tabela Endereco (Sem relacionamento direto, pois um edereço pode ser de um usuário ou de um estabelecimento)
+
+  // Relações
+  disponibilidades Disponibilidade[]
+  servicos         Servico[]
+  estabelecimentos UsuarioEstabelecimento[]
+  agendamentos_cli Agendamento[]      @relation("ClienteAgendamentos")
+  agendamentos_pre Agendamento[]      @relation("PrestadorAgendamentos")
+}
+
+model UsuarioEstabelecimento {
+  UsuarioEstabelecimentoId        Int      @id @default(autoincrement())
+  UsuarioId                       Int
+  EstabelecimentoId               Int
+  UsuarioEstabelecimentoDtCriacao DateTime @default(now())
+  UsuarioEstabelecimentoStatus    UsuarioEstabelecimentoStatus @default(ATIVO)
+
+  // Relações
+  usuario         Usuario         @relation(fields: [UsuarioId], references: [UsuarioId])
+  estabelecimento Estabelecimento @relation(fields: [EstabelecimentoId], references: [EstabelecimentoId])
+}
+
+model Endereco {
+  EnderecoId          Int           @id @default(autoincrement())
+  UsuEstId            Int           // Referente ao UsuarioId ou EstabelecimentoId, dependendo do TipoRelacao
+  TipoRelacao         UsuEstRelacao @default(USUARIO)  // 'USUARIO' ou 'ESTABELECIMENTO'
+  EnderecoRua         String        @db.VarChar(255)
+  EnderecoNumero      String        @db.VarChar(10)
+  EnderecoComplemento String?       @db.VarChar(255)
+  EnderecoBairro      String        @db.VarChar(100)
+  EnderecoCidade      String        @db.VarChar(100)
+  EnderecoEstado      String        @db.VarChar(2)   // Ex: "SP"
+  EnderecoCEP         String        @db.VarChar(10)
+}
+
+model Disponibilidade {
+  DisponibilidadeId           Int      @id @default(autoincrement())
+  PrestadorId                 Int
+  EstabelecimentoId           Int?     // Opcional, caso a disponibilidade seja para um serviço de um estabelecimento
+  DisponibilidadeData         DateTime
+  DisponibilidadeHoraInicio   String   @db.VarChar(5)  // Ex: "08:00"
+  DisponibilidadeHoraFim      String   @db.VarChar(5)  // Ex: "08:45"
+  DisponibilidadeStatus       Boolean  @default(true)
+  DisponibilidadeDiaSemana    Int                      //  0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  
+  prestador       Usuario          @relation(fields: [PrestadorId], references: [UsuarioId])
+  estabelecimento Estabelecimento? @relation(fields: [EstabelecimentoId], references: [EstabelecimentoId])
+  agendamento     Agendamento[]
+}
+
+model Servico {
+  ServicoId                 Int      @id @default(autoincrement())
+  PrestadorId               Int
+  ServicoEstabelecimentoId  Int?     // Opcional, caso o serviço seja específico para um estabelecimento
+  ServicoNome               String   @db.VarChar(100)
+  ServicoDescricao          String?
+  ServicoTempoMedio         Int      // Em minutos
+  ServicoAtivo              Boolean  @default(true)
+
+  // Relações
+  prestador       Usuario               @relation(fields: [PrestadorId], references: [UsuarioId])
+  servicoEstabelecimento ServicoEstabelecimento? @relation(fields: [ServicoEstabelecimentoId], references: [ServicoEstabelecimentoId])
+  precos          ServicoPreco[]
+  agendados       ServicoAgendamento[]
+}
+
+model ServicoEstabelecimento {
+  ServicoEstabelecimentoId  Int      @id @default(autoincrement())
+  EstabelecimentoId         Int
+  ServicoNome               String   @db.VarChar(100)
+  ServicoDescricao          String?
+  ServicoTempoMedio         Int      // Em minutos
+  ServicoAtivo              Boolean  @default(true)
+
+  estabelecimento Estabelecimento @relation(fields: [EstabelecimentoId], references: [EstabelecimentoId])
+  servicos        Servico[]
+}
+
+model ServicoPreco {
+  ServicoPrecoId         Int      @id @default(autoincrement())
+  ServicoId              Int
+  EstabelecimentoId      Int?     // Opcional, caso o preço seja específico para um estabelecimento
+  ServicoValor           Decimal  @db.Decimal(10, 2)
+  ServicoPrecoDtCriacao  DateTime @default(now())
+
+  // Relações
+  estabelecimento Estabelecimento? @relation(fields: [EstabelecimentoId], references: [EstabelecimentoId])
+  servico         Servico          @relation(fields: [ServicoId], references: [ServicoId])
+}
+
+model Agendamento {
+  AgendamentoId                 Int               @id @default(autoincrement())
+  PrestadorId                   Int
+  ClienteId                     Int
+  DisponibilidadeId             Int
+  EstabelecimentoId             Int?              // Opcional, caso o agendamento seja de um estabelecimento
+  AgendamentoDtCriacao          DateTime          @default(now())
+  AgendamentoDtServico          DateTime                              // Apenas a data
+  AgendamentoHoraServico        String            @db.VarChar(5)      // Ex: "14:30"
+  AgendamentoStatus             AppointmentStatus @default(PENDENTE)
+  AgendamentoValorTotal         Decimal           @db.Decimal(10, 2)
+  AgendamentoTempoGasto         Int                                   // Total em minutos
+  AgendamentoObservacao         String?
+  AgendamentoDescricaoTrabalho  String?                               // Descrição do trabalho realizado (após conclusão)
+
+  // Relações
+  estabelecimento Estabelecimento? @relation(fields: [EstabelecimentoId], references: [EstabelecimentoId])
+  prestador       Usuario           @relation("PrestadorAgendamentos", fields: [PrestadorId], references: [UsuarioId])
+  cliente         Usuario           @relation("ClienteAgendamentos", fields: [ClienteId], references: [UsuarioId])
+  disponibilidade Disponibilidade @relation(fields: [DisponibilidadeId], references: [DisponibilidadeId])
+  servicos        ServicoAgendamento[]
+}
+
+model ServicoAgendamento {
+  ServicoAgendamentoId  Int      @id @default(autoincrement())
+  ServicoId             Int
+  ServicoValor          Decimal  @db.Decimal(10, 2)
+  AgendamentoId         Int
+  
+  servico       Servico     @relation(fields: [ServicoId], references: [ServicoId])
+  agendamento   Agendamento @relation(fields: [AgendamentoId], references: [AgendamentoId])
+}
+
+model Notificacao {
+  NotificacaoId             String              @id @default(uuid())
+  UsuEmpId                  Int                 // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao
+  TipoRelacao               UsuEmpRelacao       @default(USUARIO)  // 'USUARIO' ou 'EMPRESA'
+  NotificacaoData           DateTime            @default(now())
+  NotificacaoTipo           String              @db.VarChar(50)
+  NotificacaoTitulo         String              @db.VarChar(100)
+  NotificacaoMensagem       String
+  NotificacaoStatus         NotificationStatus  @default(ENVIADO) // ENVIADO, EXIBIDO
+}
+
+model Log {
+  LogId           String          @id @default(uuid())
+  UsuEmpId        UsuEmpRelacao?  // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao  alguns casos não será nenhum dos dois, como por exemplo, erros do sistema, etc
+  TipoRelacao     LogTipoRelacao  // 'USUARIO' ou 'EMPRESA' ou 'SISTEMA' ou outros tipos de relação
+  LogAcao         String          @db.VarChar(20)
+  LogDetalhe      String
+  LogData         DateTime        @default(now())
+}

@@ -1,0 +1,10 @@
+# Acesso ao BD PostGreSQL
+DATABASE_URL="postgresql://postgres:senha@ip-local:porta/nome_do_banco_de_dados?schema=public"
+
+# Porta usada na API
+PORT=5000
+
+# Status (development/production)
+NODE_ENV=development
+
+JWT_SECRET=seu-segredo-jwt-aqui
