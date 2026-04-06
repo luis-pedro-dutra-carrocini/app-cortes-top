@@ -184,6 +184,28 @@ class UsuarioController {
                 }
             }
 
+            let TipoRelacao = '';
+            if (UsuarioTipo === 'CLIENTE' || UsuarioTipo === 'PRESTADOR') {
+                TipoRelacao = 'USUARIO';
+            } else if (UsuarioTipo === 'EMPRESA') {
+                TipoRelacao = 'EMPRESA';
+            } else {
+                return res.status(403).json({
+                    error: 'Tipo de usuário inválido para login'
+                });
+            }
+
+            // Adicionar registro na tabela log
+            await prisma.log.create({
+                data: {
+                    UsuEmpId: usuarioSemSenha.UsuarioId,
+                    LogAcao: 'LOGOUT',
+                    TipoRelacao: TipoRelacao,
+                    LogDetalhe: 'Usuário realizou login',
+                    LogData: new Date()
+                }
+            });
+
             res.status(200).json({
                 message: 'Login realizado com sucesso',
                 token,
@@ -1169,25 +1191,30 @@ class UsuarioController {
         }
     }
 
-    // Rota que registra o logout do usuário (apenas para clientes e prestadores)
+    // Rota que registra o logout do usuário (para todos os tipos)
     async logout(req, res) {
         try {
             const usuarioId = req.usuario.usuarioId;
 
             const usuarioTipo = req.usuario.usuarioTipo;
 
-            if (usuarioTipo !== 'CLIENTE' && usuarioTipo !== 'PRESTADOR') {
+            let TipoRelacao = '';
+            if (usuarioTipo === 'CLIENTE' || usuarioTipo === 'PRESTADOR') {
+                TipoRelacao = 'USUARIO';
+            } else if (usuarioTipo === 'EMPRESA') {
+                TipoRelacao = 'EMPRESA';
+            } else {
                 return res.status(403).json({
                     error: 'Tipo de usuário inválido para logout'
                 });
             }
 
-            // Adiocnar registro na tabela log
+            // Adicionar registro na tabela log
             await prisma.log.create({
                 data: {
                     UsuEmpId: usuarioId,
                     LogAcao: 'LOGOUT',
-                    TipoRelacao: 'USUARIO',
+                    TipoRelacao: TipoRelacao,
                     LogDetalhe: 'Usuário realizou logout',
                     LogData: new Date()
                 }

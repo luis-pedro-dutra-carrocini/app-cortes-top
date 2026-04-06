@@ -1,7 +1,58 @@
 // src/controllers/agendamentoController.js
 const prisma = require('../prisma.js');
+const crypto = require('crypto');
 
 class AgendamentoController {
+
+    // Rota para gravar quando usuários iniciam um agendamento, mesmo sem te-lo finalizado (Testes AB)
+    async iniciarAgendamento(req, res) {
+        try {
+            const {
+                Tela
+            } = req.body;
+
+            let LogAcao = '';
+            switch (Tela) {
+                case 'MOBILE_PESQUISA': LogAcao = 'AGENBTNPES'
+                case 'MOBILE_BTNCENTRAL': LogAcao = 'AGENBTNCEN'
+                case 'MOBILE_BTNTELAHOME': LogAcao = 'AGENBTNTELA'
+            }
+
+            // Verificar se o usuário é CLIENTE
+            if (req.usuario.usuarioTipo !== 'CLIENTE') {
+                return res.status(403).json({
+                    error: 'Apenas clientes podem realizar agendamentos'
+                });
+            }
+
+            const usuarioId = req.usuario.usuarioId;
+
+            const uuid = crypto.randomUUID();
+
+            // Adicionar registro na tabela log
+            await prisma.log.create({
+                data: {
+                    UsuEmpId: usuarioId,
+                    LogAcao: LogAcao,
+                    TipoRelacao: 'USUARIO',
+                    LogDetalhe: uuid,
+                    LogData: new Date()
+                }
+            });
+
+            res.status(201).json({
+                message: 'Registro de inicio de agendamento criado com sucesso',
+                uuid: uuid,
+                tela: LogAcao
+            });
+
+        } catch (error) {
+            console.error('Erro ao registrar início de agendamento:', error);
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    }
 
     // Cadastrar agendamento (apenas CLIENTE)
     async cadastrarAgendamento(req, res) {
@@ -12,7 +63,8 @@ class AgendamentoController {
                 AgendamentoDtServico,
                 AgendamentoHoraServico,
                 AgendamentoObservacao,
-                servicos // Array de IDs dos serviços
+                servicos, // Array de IDs dos serviços
+                uuid
             } = req.body;
 
             // Verificar se o usuário é CLIENTE
@@ -230,6 +282,21 @@ class AgendamentoController {
 
                 return agendamentoCompleto;
             });
+
+            // Adicionar registro de finalização na tabela log
+
+            if (uuid) {
+                const usuarioId = req.usuario.usuarioId;
+                await prisma.log.create({
+                    data: {
+                        UsuEmpId: usuarioId,
+                        LogAcao: 'FIMAGEN',
+                        TipoRelacao: 'USUARIO',
+                        LogDetalhe: uuid,
+                        LogData: new Date()
+                    }
+                });
+            }
 
             // Formatar resposta
             const respostaFormatada = {
