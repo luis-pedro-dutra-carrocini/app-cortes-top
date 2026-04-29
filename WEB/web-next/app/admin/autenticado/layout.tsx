@@ -65,6 +65,7 @@ export default function AdminLayout({
       href: "/admin/autenticado/dashboard",
       icon: <LayoutDashboard size={20} />
     },
+    /*
     {
       title: "Unidades",
       href: "/admin/autenticado/unidades",
@@ -75,6 +76,7 @@ export default function AdminLayout({
       href: "/admin/autenticado/gestores",
       icon: <UserCircle size={20} />
     }
+    */
   ]
 
   const isActive = (href: string) => {
@@ -105,10 +107,10 @@ export default function AdminLayout({
         `}>
           {sidebarOpen ? (
             <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              Sistema<span className="text-gray-500 dark:text-gray-400"> Chamados</span>
+              Gerenciar<span className="text-gray-500 dark:text-gray-400"> Sistema</span>
             </span>
           ) : (
-            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">A</span>
+            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">G</span>
           )}
         </div>
 

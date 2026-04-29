@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import Cookies from "js-cookie"
-import axios from "axios"
 import { apiClient } from "@/lib/api"
 import { useRouter } from "next/navigation"
 
@@ -32,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Verificar se existe token salvo ao iniciar
     const storedToken = Cookies.get("admin_token")
     const storedUser = Cookies.get("admin_id")
+    //console.log("Token armazenado:", storedUser) // LOG para debug
 
     if (storedToken && storedUser) {
       setToken(storedToken)
@@ -41,23 +41,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (usuario: string, senha: string) => {
+  const login = async (usuarioN: string, senha: string) => {
     try {
       setIsLoading(true)
       
       const response = await apiClient.post("/admin/login", {
-        AdministradorUsuario: usuario,
+        AdministradorUsuario: usuarioN,
         AdministradorSenha: senha
       })
 
-      const { token, usuarioR } = response.data
+      const { token, usuario } = response.data
       
       // Salvar nos cookies
       Cookies.set("admin_token", token, { expires: 1/3 }) // 8 horas
-      Cookies.set("admin_id", JSON.stringify(usuarioR), { expires: 1/3 })
+      Cookies.set("admin_id", JSON.stringify(usuario), { expires: 1/3 })
       
       setToken(token)
-      setUser(usuarioR)
+      setUser(usuario)
       
       // Redirecionar para dashboard
       router.push("/admin/autenticado/dashboard")
