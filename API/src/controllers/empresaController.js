@@ -46,7 +46,7 @@ class EmpresaController {
 
         } catch (error) {
             console.error('Erro ao buscar empresas:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao buscar empresas' });
         }
     }
 
@@ -108,7 +108,7 @@ class EmpresaController {
 
         } catch (error) {
             console.error('Erro ao buscar estabelecimentos:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao buscar estabelecimentos' });
         }
     }
 
@@ -166,7 +166,7 @@ class EmpresaController {
 
         } catch (error) {
             console.error('Erro ao buscar prestadores por estabelecimento:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao buscar prestadores por estabelecimento' });
         }
     }
     

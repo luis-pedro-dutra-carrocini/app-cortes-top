@@ -3,6 +3,19 @@ const prisma = require('../prisma.js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+const { OAuth2Client } = require('google-auth-library');
+
+// Configuração do Google OAuth
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Usar a API Intl.DateTimeFormat de forma mais segura
+function getBrasilDateTime() {
+    const now = new Date();
+    // Subtrair 3 horas (3 * 60 * 60 * 1000 = 10800000 milissegundos)
+    now.setHours(now.getHours() - 3);
+    return now;
+}
+
 class UsuarioController {
 
     // Login do usuário
@@ -78,7 +91,8 @@ class UsuarioController {
                     UsuarioTipo: 'EMPRESA',
                     UsuarioDtCriacao: empresa.EmpresaDtCriacao,
                     UsuarioAtivo: UsuarioAtivo,
-                    EmpresaCNPJ: empresa.EmpresaCNPJ
+                    EmpresaCNPJ: empresa.EmpresaCNPJ,
+                    EmpresaTipoCadastro: empresa.EmpresaTipoCadastro
                 };
 
                 // Atualizar último login
@@ -86,7 +100,7 @@ class UsuarioController {
 
                 // Ajusta para o fuso de Brasília (UTC -3)
                 const dataBrasilia = new Date(dataLocal.getTime() - (3 * 60 * 60 * 1000));
-                
+
                 await prisma.empresa.update({
                     where: { EmpresaId: empresa.EmpresaId },
                     data: { EmpresaUltimoLogin: dataBrasilia }
@@ -149,7 +163,8 @@ class UsuarioController {
                     UsuarioTelefone: usuario.UsuarioTelefone,
                     UsuarioTipo: usuario.UsuarioTipo,
                     UsuarioDtCriacao: usuario.UsuarioDtCriacao,
-                    UsuarioAtivo: UsuarioAtivo
+                    UsuarioAtivo: UsuarioAtivo,
+                    UsuarioTipoCadastro: usuario.UsuarioTipoCadastro
                 };
 
                 // Atualizar último login
@@ -199,10 +214,10 @@ class UsuarioController {
             await prisma.log.create({
                 data: {
                     UsuEmpId: usuarioSemSenha.UsuarioId,
-                    LogAcao: 'LOGOUT',
+                    LogAcao: 'LOGIN',
                     TipoRelacao: TipoRelacao,
                     LogDetalhe: 'Usuário realizou login',
-                    LogData: new Date()
+                    LogData: getBrasilDateTime()
                 }
             });
 
@@ -215,7 +230,272 @@ class UsuarioController {
         } catch (error) {
             console.error('Erro no login:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro no login'
+            });
+        }
+    }
+
+    // Login com Google
+    async loginGoogle(req, res) {
+        try {
+            const { googleToken, usuarioTipo, tipoRequisicao } = req.body;
+
+            // tipoRequisicao = Login ou Cadastro (Usar mesma rota)
+
+            if (!googleToken || !usuarioTipo) {
+                return res.status(400).json({
+                    error: 'Token do Google e tipo de usuário são obrigatórios'
+                });
+            }
+
+            // Verificar o token do Google
+            const ticket = await googleClient.verifyIdToken({
+                idToken: googleToken,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+
+            const payload = ticket.getPayload();
+            const { email, name, picture } = payload;
+
+            if (!email) {
+                return res.status(400).json({
+                    error: 'Email não encontrado no token do Google'
+                });
+            }
+
+            let usuario = null;
+            let usuarioSemSenha = null;
+            let token = null;
+
+            // Verificar o tipo de usuário e buscar na tabela correspondente
+            if (usuarioTipo === 'EMPRESA') {
+                // Buscar empresa por email
+                let empresa = await prisma.empresa.findFirst({
+                    where: {
+                        EmpresaEmail: email.trim(),
+                        EmpresaStatus: { in: ['ATIVA', 'BLOQUEADA', 'BLOQUEADAPAGAMENTO'] }
+                    }
+                });
+
+                // Se empresa não existe, criar uma nova conta caso for cadastro
+                if (!empresa) {
+                    if (tipoRequisicao === 'CADASTRO') {
+                        const nomeEmpresa = name || email.split('@')[0];
+
+                        empresa = await prisma.empresa.create({
+                            data: {
+                                EmpresaNome: nomeEmpresa,
+                                EmpresaEmail: email,
+                                EmpresaTelefone: '',
+                                EmpresaCNPJ: '',
+                                EmpresaSenha: '', // Sem senha para login social
+                                EmpresaStatus: 'ATIVA',
+                                EmpresaDtCriacao: getBrasilDateTime(),
+                                EmpresaTipoCadastro: 'GOOGLE'
+                            }
+                        });
+                    } else {
+                        return res.status(403).json({
+                            error: 'E-mail não cadatrado, cadastre-se para acessar'
+                        });
+                    }
+                }
+
+                if (empresa.EmpresaStatus === 'BLOQUEADA') {
+                    return res.status(403).json({
+                        error: 'Conta bloqueada. Entre em contato com o suporte.'
+                    });
+                }
+
+                // Gerar token JWT
+                token = jwt.sign(
+                    {
+                        usuarioId: empresa.EmpresaId,
+                        usuarioTipo: 'EMPRESA',
+                        usuarioEmail: empresa.EmpresaEmail
+                    },
+                    process.env.JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+
+                let UsuarioAtivo = empresa.EmpresaStatus !== 'BLOQUEADAPAGAMENTO';
+
+                usuarioSemSenha = {
+                    UsuarioId: empresa.EmpresaId,
+                    UsuarioNome: empresa.EmpresaNome,
+                    UsuarioEmail: empresa.EmpresaEmail,
+                    UsuarioTelefone: empresa.EmpresaTelefone,
+                    UsuarioTipo: 'EMPRESA',
+                    UsuarioDtCriacao: empresa.EmpresaDtCriacao,
+                    UsuarioAtivo: UsuarioAtivo,
+                    EmpresaCNPJ: empresa.EmpresaCNPJ
+                };
+
+                // Atualizar último login
+                await prisma.empresa.update({
+                    where: { EmpresaId: empresa.EmpresaId },
+                    data: { EmpresaUltimoLogin: getBrasilDateTime() }
+                });
+
+            } else {
+                // Buscar usuário (CLIENTE ou PRESTADOR)
+                usuario = await prisma.usuario.findFirst({
+                    where: {
+                        UsuarioEmail: email.trim(),
+                        UsuarioTipo: usuarioTipo,
+                        UsuarioStatus: { in: ['ATIVO', 'BLOQUEADO', 'BLOQUEADOPAGAMENTO'] }
+                    }
+                });
+
+                // Se usuário não existe, criar uma nova conta
+                if (!usuario) {
+                    if (tipoRequisicao === 'CADASTRO') {
+                        usuario = await prisma.usuario.create({
+                            data: {
+                                UsuarioNome: name || email.split('@')[0],
+                                UsuarioEmail: email,
+                                UsuarioTelefone: '',
+                                UsuarioSenha: '', // Sem senha para login social
+                                UsuarioTipo: usuarioTipo,
+                                UsuarioStatus: 'ATIVO',
+                                UsuarioDtCriacao: getBrasilDateTime(),
+                                UsuarioTipoCadastro: 'GOOGLE'
+                            }
+                        });
+                    } else {
+                        return res.status(403).json({
+                            error: 'E-mail não cadatrado, cadastre-se para acessar'
+                        });
+                    }
+                }
+
+                if (usuario.UsuarioStatus === 'BLOQUEADO') {
+                    return res.status(403).json({
+                        error: 'Conta bloqueada. Entre em contato com o suporte.'
+                    });
+                }
+
+                // Gerar token JWT
+                token = jwt.sign(
+                    {
+                        usuarioId: usuario.UsuarioId,
+                        usuarioTipo: usuario.UsuarioTipo,
+                        usuarioEmail: usuario.UsuarioEmail
+                    },
+                    process.env.JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+
+                let UsuarioAtivo = usuario.UsuarioStatus !== 'BLOQUEADOPAGAMENTO';
+
+                usuarioSemSenha = {
+                    UsuarioId: usuario.UsuarioId,
+                    UsuarioNome: usuario.UsuarioNome,
+                    UsuarioEmail: usuario.UsuarioEmail,
+                    UsuarioTelefone: usuario.UsuarioTelefone,
+                    UsuarioTipo: usuario.UsuarioTipo,
+                    UsuarioDtCriacao: usuario.UsuarioDtCriacao,
+                    UsuarioAtivo: UsuarioAtivo
+                };
+
+                // Buscar endereço se for PRESTADOR
+                if (usuario.UsuarioTipo === 'PRESTADOR' && usuario.UsuarioEnderecoId) {
+                    const endereco = await prisma.endereco.findUnique({
+                        where: { EnderecoId: usuario.UsuarioEnderecoId }
+                    });
+
+                    if (endereco) {
+                        usuarioSemSenha = {
+                            ...usuarioSemSenha,
+                            EnderecoCEP: endereco.EnderecoCEP,
+                            EnderecoRua: endereco.EnderecoRua,
+                            EnderecoNumero: endereco.EnderecoNumero,
+                            EnderecoComplemento: endereco.EnderecoComplemento,
+                            EnderecoBairro: endereco.EnderecoBairro,
+                            EnderecoCidade: endereco.EnderecoCidade,
+                            EnderecoEstado: endereco.EnderecoEstado
+                        };
+                    }
+                }
+
+                // Atualizar último login
+                await prisma.usuario.update({
+                    where: { UsuarioId: usuario.UsuarioId },
+                    data: { UsuarioUltimoLogin: getBrasilDateTime() }
+                });
+            }
+
+            let TipoRelacao = '';
+            if (usuarioTipo === 'CLIENTE' || usuarioTipo === 'PRESTADOR') {
+                TipoRelacao = 'USUARIO';
+            } else if (usuarioTipo === 'EMPRESA') {
+                TipoRelacao = 'EMPRESA';
+            }
+
+            // Registrar login no log
+            await prisma.log.create({
+                data: {
+                    UsuEmpId: usuarioSemSenha.UsuarioId,
+                    LogAcao: 'LOGIN_GOOGLE',
+                    TipoRelacao: TipoRelacao,
+                    LogDetalhe: 'Usuário realizou login com Google',
+                    LogData: getBrasilDateTime()
+                }
+            });
+
+            res.status(200).json({
+                message: 'Login com Google realizado com sucesso',
+                token,
+                usuario: usuarioSemSenha
+            });
+
+        } catch (error) {
+            console.error('Erro no login com Google:', error);
+            res.status(500).json({
+                error: 'Erro no login com Google'
+            });
+        }
+    }
+
+    // Rota que registra o logout do usuário (para todos os tipos)
+    async logout(req, res) {
+        try {
+            //console.log('================================================================');
+            //console.log('Logout solicitado para usuário:', req.usuario);
+            const usuarioId = req.usuario.usuarioId;
+
+            const usuarioTipo = req.usuario.usuarioTipo;
+
+            let TipoRelacao = '';
+            if (usuarioTipo === 'CLIENTE' || usuarioTipo === 'PRESTADOR') {
+                TipoRelacao = 'USUARIO';
+            } else if (usuarioTipo === 'EMPRESA') {
+                TipoRelacao = 'EMPRESA';
+            } else {
+                return res.status(403).json({
+                    error: 'Tipo de usuário inválido para logout'
+                });
+            }
+
+            // Adicionar registro na tabela log
+            await prisma.log.create({
+                data: {
+                    UsuEmpId: usuarioId,
+                    LogAcao: 'LOGOUT',
+                    TipoRelacao: TipoRelacao,
+                    LogDetalhe: 'Usuário realizou logout',
+                    LogData: getBrasilDateTime()
+                }
+            });
+
+            res.status(200).json({
+                message: 'Logout realizado com sucesso'
+            });
+
+        } catch (error) {
+            console.error('Erro ao buscar usuário:', error);
+            res.status(500).json({
+                error: 'Erro ao buscar usuário'
             });
         }
     }
@@ -236,6 +516,7 @@ class UsuarioController {
                     UsuarioEmail: true,
                     UsuarioTipo: true,
                     UsuarioStatus: true,
+                    UsuarioTipoCadastro: true,
                 }
             });
 
@@ -260,7 +541,7 @@ class UsuarioController {
         } catch (error) {
             console.error('Erro ao buscar usuário:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar usuário'
             });
         }
     }
@@ -318,7 +599,7 @@ class UsuarioController {
         } catch (error) {
             console.error('Erro ao listar últimos prestadores:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar últimos prestadores'
             });
         }
     }
@@ -379,7 +660,7 @@ class UsuarioController {
         } catch (error) {
             console.error('Erro ao pesquisar prestadores:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao pesquisar prestadores'
             });
         }
     }
@@ -576,7 +857,8 @@ class UsuarioController {
                             UsuarioEmail: UsuarioEmail.trim(),
                             UsuarioTipo: tipo,
                             UsuarioSenha: hashedPassword,
-                            UsuarioEnderecoId: enderecoId
+                            UsuarioEnderecoId: enderecoId,
+                            UsuarioTipoCadastro: 'NORMAL'
                         },
                         select: {
                             UsuarioId: true,
@@ -584,7 +866,8 @@ class UsuarioController {
                             UsuarioEmail: true,
                             UsuarioTelefone: true,
                             UsuarioTipo: true,
-                            UsuarioEnderecoId: true
+                            UsuarioEnderecoId: true,
+                            UsuarioTipoCadastro: true,
                         }
                     });
 
@@ -606,14 +889,16 @@ class UsuarioController {
                             EmpresaCNPJ: EmpresaCNPJ.trim(),
                             EmpresaTelefone: UsuarioTelefone.trim(),
                             EmpresaEmail: UsuarioEmail.trim(),
-                            EmpresaSenha: hashedPassword
+                            EmpresaSenha: hashedPassword,
+                            EmpresaTipoCadastro: 'NORMAL',
                         },
                         select: {
                             EmpresaId: true,
                             EmpresaNome: true,
                             EmpresaCNPJ: true,
                             EmpresaTelefone: true,
-                            EmpresaEmail: true
+                            EmpresaEmail: true,
+                            EmpresaTipoCadastro: true,
                         }
                     });
 
@@ -631,7 +916,7 @@ class UsuarioController {
         } catch (error) {
             console.error('Erro ao cadastrar usuário:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao cadastrar usuário'
             });
         }
     }
@@ -1005,7 +1290,7 @@ class UsuarioController {
             }
 
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar perfil'
             });
         }
     }
@@ -1159,7 +1444,7 @@ class UsuarioController {
                     });
 
                     // 4. Retirando o usuário dos estabelecimentos que ele estava vinculado
-                    await prisma.usuarioEstabelecimento.update({
+                    await prisma.usuarioEstabelecimento.updateMany({
                         where: { UsuarioId: usuarioId },
                         data: { UsuarioEstabelecimentoStatus: 'EXCLUIDO' }
                     });
@@ -1187,48 +1472,125 @@ class UsuarioController {
             });
         } catch (error) {
             console.error('Erro ao excluir usuário:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao excluir usuário' });
         }
     }
 
-    // Rota que registra o logout do usuário (para todos os tipos)
-    async logout(req, res) {
+    async validarUsuario(req, res) {
         try {
-            const usuarioId = req.usuario.usuarioId;
+            const usuarioId = parseInt(req.usuario.usuarioId);
 
-            const usuarioTipo = req.usuario.usuarioTipo;
-
-            let TipoRelacao = '';
-            if (usuarioTipo === 'CLIENTE' || usuarioTipo === 'PRESTADOR') {
-                TipoRelacao = 'USUARIO';
-            } else if (usuarioTipo === 'EMPRESA') {
-                TipoRelacao = 'EMPRESA';
-            } else {
-                return res.status(403).json({
-                    error: 'Tipo de usuário inválido para logout'
+            if (req.usuario.usuarioTipo === 'EMPRESA') {
+                // Verificar se a empresa existe
+                const empresa = await prisma.empresa.findUnique({
+                    where: { EmpresaId: usuarioId },
+                    select: {
+                        EmpresaId: true,
+                        EmpresaNome: true,
+                        EmpresaEmail: true,
+                        EmpresaTelefone: true,
+                        EmpresaCNPJ: true,
+                        EmpresaStatus: true,
+                        EmpresaDtCriacao: true
+                    }
                 });
+
+                if (!empresa) {
+                    return res.status(404).json({ error: 'Empresa não encontrada' });
+                }
+
+                const usuarioCompleto = {
+                    UsuarioId: empresa.EmpresaId,
+                    UsuarioNome: empresa.EmpresaNome,
+                    UsuarioEmail: empresa.EmpresaEmail,
+                    UsuarioTelefone: empresa.EmpresaTelefone,
+                    UsuarioTipo: 'EMPRESA',
+                    UsuarioDtCriacao: empresa.EmpresaDtCriacao,
+                    UsuarioStatus: empresa.EmpresaStatus,
+                    EmpresaCNPJ: empresa.EmpresaCNPJ
+                }
+
+                // Registrar entradasem login
+                await prisma.log.create({
+                    data: {
+                        UsuEmpId: usuarioCompleto.UsuarioId,
+                        LogAcao: 'ENTRADA_DIRETA',
+                        TipoRelacao: 'EMPRESA',
+                        LogDetalhe: 'Usuário entrou diretamente na aplicação (token válido)',
+                        LogData: getBrasilDateTime()
+                    }
+                });
+
+                //console.log('Empresa encontrada:', usuarioCompleto);
+                return res.json({ valid: true, usuario: usuarioCompleto });
+
+            } else {
+                // Verificar se usuário existe
+                const usuario = await prisma.usuario.findUnique({
+                    where: { UsuarioId: usuarioId },
+                    select: {
+                        UsuarioId: true,
+                        UsuarioNome: true,
+                        UsuarioEmail: true,
+                        UsuarioTelefone: true,
+                        UsuarioTipo: true,
+                        UsuarioEnderecoId: true,
+                        UsuarioStatus: true,
+                        UsuarioDtCriacao: true
+                    }
+                });
+
+                if (!usuario) {
+                    return res.status(404).json({ error: 'Usuário não encontrado' });
+                }
+
+                let endereco = null;
+                if (usuario.UsuarioTipo === 'PRESTADOR' && usuario.UsuarioEnderecoId) {
+                    endereco = await prisma.endereco.findUnique({
+                        where: { EnderecoId: usuario.UsuarioEnderecoId },
+                        select: {
+                            EnderecoRua: true,
+                            EnderecoNumero: true,
+                            EnderecoComplemento: true,
+                            EnderecoBairro: true,
+                            EnderecoCidade: true,
+                            EnderecoEstado: true,
+                            EnderecoCEP: true
+                        }
+                    });
+                }
+
+                const usuarioCompleto = {
+                    ...usuario,
+                    ...(endereco && {
+                        EnderecoRua: endereco.EnderecoRua,
+                        EnderecoNumero: endereco.EnderecoNumero,
+                        EnderecoComplemento: endereco.EnderecoComplemento,
+                        EnderecoBairro: endereco.EnderecoBairro,
+                        EnderecoCidade: endereco.EnderecoCidade,
+                        EnderecoEstado: endereco.EnderecoEstado,
+                        EnderecoCEP: endereco.EnderecoCEP
+                    })
+                };
+
+                // Registrar entradasem login
+                await prisma.log.create({
+                    data: {
+                        UsuEmpId: usuarioCompleto.UsuarioId,
+                        LogAcao: 'ENTRADA_DIRETA',
+                        TipoRelacao: 'USUARIO',
+                        LogDetalhe: 'Usuário entrou diretamente na aplicação (token válido)',
+                        LogData: getBrasilDateTime()
+                    }
+                });
+
+                //console.log('Usuário encontrado:', usuarioCompleto);
+                return res.json({ valid: true, usuario: usuarioCompleto });
             }
 
-            // Adicionar registro na tabela log
-            await prisma.log.create({
-                data: {
-                    UsuEmpId: usuarioId,
-                    LogAcao: 'LOGOUT',
-                    TipoRelacao: TipoRelacao,
-                    LogDetalhe: 'Usuário realizou logout',
-                    LogData: new Date()
-                }
-            });
-
-            res.status(200).json({
-                message: 'Logout realizado com sucesso'
-            });
-
         } catch (error) {
-            console.error('Erro ao buscar usuário:', error);
-            res.status(500).json({
-                error: error.message
-            });
+            console.error('Erro ao validar usuário:', error);
+            res.status(500).json({ error: 'Erro ao validar usuário' });
         }
     }
 

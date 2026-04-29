@@ -94,7 +94,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao cadastrar serviço do estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao cadastrar serviço do estabelecimento'
             });
         }
     }
@@ -144,7 +144,7 @@ class ServicoEstabelecimentoController {
                 }
             });
 
-            console.log('servicos | ', servicos);
+            //console.log('servicos | ', servicos);
 
             res.status(200).json({
                 data: servicos,
@@ -157,7 +157,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao listar serviços do estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar serviços do estabelecimento'
             });
         }
     }
@@ -262,7 +262,7 @@ class ServicoEstabelecimentoController {
                 };
             });
 
-            console.log('servicosFormatados | ', servicosFormatados);
+            //console.log('servicosFormatados | ', servicosFormatados);
 
             res.status(200).json({
                 data: servicosFormatados,
@@ -275,7 +275,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao listar serviços do estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar serviços do estabelecimento'
             });
         }
     }
@@ -331,7 +331,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao buscar serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar serviço'
             });
         }
     }
@@ -428,7 +428,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao atualizar serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar serviço'
             });
         }
     }
@@ -573,7 +573,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao vincular serviço a prestador:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao vincular serviço a prestador'
             });
         }
     }
@@ -628,7 +628,7 @@ class ServicoEstabelecimentoController {
                 }
             });
 
-            console.log('prestadoresComVinculo | ', prestadoresComVinculo);
+            //console.log('prestadoresComVinculo | ', prestadoresComVinculo);
 
             // IDs dos prestadores com vínculo
             const prestadoresIds = prestadoresComVinculo.map(v => v.usuario.UsuarioId);
@@ -660,7 +660,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao listar prestadores disponíveis:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar prestadores disponíveis'
             });
         }
     }
@@ -710,7 +710,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao listar prestadores vinculados:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar prestadores vinculados'
             });
         }
     }
@@ -782,7 +782,7 @@ class ServicoEstabelecimentoController {
         } catch (error) {
             console.error('Erro ao desvincular serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao desvincular serviço'
             });
         }
     }
@@ -847,7 +847,7 @@ class ServicoEstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao listar serviços do prestador por estabelecimento:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar serviços do prestador por estabelecimento' });
         }
     }
 

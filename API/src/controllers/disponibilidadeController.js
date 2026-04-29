@@ -155,7 +155,7 @@ class DisponibilidadeController {
         } catch (error) {
             console.error('Erro ao cadastrar disponibilidade:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao cadastrar disponibilidade'
             });
         }
     }
@@ -204,8 +204,8 @@ class DisponibilidadeController {
                 const inicio = new Date(anoInicio, mesInicio - 1, diaInicio, 0, 0, 0, 0);
                 const fim = new Date(anoFim, mesFim - 1, diaFim, 23, 59, 59, 999);
 
-                console.log('Data Início local = ', inicio.toString());
-                console.log('Data Fim local = ', fim.toString());
+                //console.log('Data Início local = ', inicio.toString());
+                //console.log('Data Fim local = ', fim.toString());
 
                 filtroData.DisponibilidadeData = {
                     gte: inicio,
@@ -287,7 +287,7 @@ class DisponibilidadeController {
         } catch (error) {
             console.error('Erro ao listar disponibilidades:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar disponibilidades'
             });
         }
     }
@@ -402,7 +402,7 @@ class DisponibilidadeController {
             console.error('Erro ao listar disponibilidades por data:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao listar disponibilidades por data'
             });
         }
     }
@@ -453,7 +453,7 @@ class DisponibilidadeController {
         } catch (error) {
             console.error('Erro ao buscar disponibilidade:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar disponibilidade'
             });
         }
     }
@@ -646,7 +646,7 @@ class DisponibilidadeController {
         } catch (error) {
             console.error('Erro ao atualizar disponibilidade:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar disponibilidade'
             });
         }
     }
@@ -729,7 +729,7 @@ class DisponibilidadeController {
 
         } catch (error) {
             console.error('Erro ao excluir disponibilidade:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao excluir disponibilidade' });
         }
     }
 
@@ -818,7 +818,7 @@ class DisponibilidadeController {
         } catch (error) {
             console.error('Erro ao buscar disponibilidades por data:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar disponibilidades por data'
             });
         }
     }
@@ -885,7 +885,7 @@ class DisponibilidadeController {
 
         } catch (error) {
             console.error('Erro ao listar disponibilidades por estabelecimento de um prestador:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar disponibilidades por estabelecimento de um prestador' });
         }
     }
 
@@ -984,7 +984,7 @@ class DisponibilidadeController {
 
         } catch (error) {
             console.error('Erro ao listar disponibilidades por estabelecimento:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar disponibilidades por estabelecimento' });
         }
     }
 

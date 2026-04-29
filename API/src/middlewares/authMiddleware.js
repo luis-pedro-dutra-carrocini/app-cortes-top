@@ -28,12 +28,16 @@ const authMiddleware = (req, res, next) => {
             return res.status(401).json({ error: 'Token inválido ou expirado' });
         }
 
+        //console.log('req.usuario = antes =', req.usuario);
+
         // Adicionar dados do usuário à requisição
         req.usuario = {
             usuarioId: decoded.usuarioId,
             usuarioTipo: decoded.usuarioTipo,
             usuarioEmail: decoded.usuarioEmail
         };
+
+        //console.log('req.usuario = depois =', req.usuario);
 
         return next();
     });

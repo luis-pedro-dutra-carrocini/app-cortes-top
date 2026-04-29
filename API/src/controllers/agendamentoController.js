@@ -11,12 +11,32 @@ class AgendamentoController {
                 Tela
             } = req.body;
 
-            let LogAcao = '';
-            switch (Tela) {
-                case 'MOBILE_PESQUISA': LogAcao = 'AGENBTNPES'
-                case 'MOBILE_BTNCENTRAL': LogAcao = 'AGENBTNCEN'
-                case 'MOBILE_BTNTELAHOME': LogAcao = 'AGENBTNTELA'
+            if (req.usuario.usuarioTipo !== 'CLIENTE') {
+                return res.status(403).json({
+                    error: 'Apenas clientes podem realizar agendamentos'
+                });
             }
+
+            //console.log('Tela recebida:', Tela);
+
+            let LogAcao = '';
+            if (!Tela) {
+                return res.status(400).json({
+                    error: 'O campo "Tela" é obrigatório'
+                });
+            }else{
+                if (Tela === 'MOBILE_PESQUISA') {
+                    LogAcao = 'AGENBTNPES';
+                } else if (Tela === 'MOBILE_BTNCENTRAL') {
+                    LogAcao = 'AGENBTNCEN';
+                } else if (Tela === 'MOBILE_BTNTELAHOME') {
+                    LogAcao = 'AGENBTNTELA';
+                } else {
+                    LogAcao = 'AGENBTNNEM';
+                }
+            }
+
+            //console.log('LogAcao definida como:', LogAcao);
 
             // Verificar se o usuário é CLIENTE
             if (req.usuario.usuarioTipo !== 'CLIENTE') {
@@ -43,13 +63,14 @@ class AgendamentoController {
             res.status(201).json({
                 message: 'Registro de inicio de agendamento criado com sucesso',
                 uuid: uuid,
-                tela: LogAcao
+                tela: LogAcao,
+                success: true
             });
 
         } catch (error) {
             console.error('Erro ao registrar início de agendamento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao registrar início de agendamento'
             });
         }
     }
@@ -321,7 +342,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao cadastrar agendamento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao cadastrar agendamento'
             });
         }
     }
@@ -390,7 +411,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao listar agendamentos:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar agendamentos'
             });
         }
     }
@@ -494,7 +515,7 @@ class AgendamentoController {
                 }))
             }));
 
-            console.log('agendamentosFormatados = ', JSON.stringify(agendamentosFormatados, null, 2));
+            //console.log('agendamentosFormatados = ', JSON.stringify(agendamentosFormatados, null, 2));
 
             res.status(200).json({
                 success: true,
@@ -510,7 +531,7 @@ class AgendamentoController {
             console.error('Erro ao listar agendamentos do cliente:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao listar agendamentos do cliente'
             });
         }
     }
@@ -608,7 +629,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao listar agendamentos:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar agendamentos'
             });
         }
     }
@@ -731,7 +752,7 @@ class AgendamentoController {
 
         } catch (error) {
             console.error('Erro ao listar agendamentos da empresa:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar agendamentos da empresa' });
         }
     }
 
@@ -851,7 +872,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao buscar agendamento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar agendamento'
             });
         }
     }
@@ -942,7 +963,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao atualizar status:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar status'
             });
         }
     }
@@ -1274,7 +1295,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao atualizar agendamento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar agendamento'
             });
         }
     }
@@ -1387,7 +1408,7 @@ class AgendamentoController {
 
         } catch (error) {
             console.error('Erro ao cancelar agendamento:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao cancelar agendamento' });
         }
     }
 
@@ -1475,7 +1496,7 @@ class AgendamentoController {
         } catch (error) {
             console.error('Erro ao listar agendamentos por período:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar agendamentos por período'
             });
         }
     }
@@ -1531,7 +1552,7 @@ class AgendamentoController {
 
         } catch (error) {
             console.error('Erro ao buscar últimas empresas:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao buscar últimas empresas' });
         }
     }
 

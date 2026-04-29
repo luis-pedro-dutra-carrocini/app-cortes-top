@@ -89,17 +89,18 @@ model Administrador {
 }
 
 model Empresa {
-  EmpresaId           Int      @id @default(autoincrement())
-  EmpresaNome         String   @db.VarChar(100)
-  EmpresaCNPJ         String   @db.VarChar(20)
-  EmpresaLogo         String?  @db.VarChar(255) // URL ou caminho para o logo da empresa
+  EmpresaId           Int           @id @default(autoincrement())
+  EmpresaNome         String        @db.VarChar(100)
+  EmpresaCNPJ         String        @db.VarChar(20)
+  EmpresaLogo         String?       @db.VarChar(255)  // URL ou caminho para o logo da empresa
   EmpresaDescricao    String?
   EmpresaStatus       EmpresaStatus @default(ATIVA)
-  EmpresaDtCriacao    DateTime @default(now())
-  EmpresaTelefone     String   @db.VarChar(15)
-  EmpresaEmail        String   @db.VarChar(256)
+  EmpresaDtCriacao    DateTime      @default(now())
+  EmpresaTelefone     String        @db.VarChar(15)
+  EmpresaEmail        String        @db.VarChar(256)
   EmpresaSenha        String
   EmpresaUltimoLogin  DateTime?
+  EmpresaTipoCadastro String?       @db.VarChar(50)  // 'NORMAL', 'GOOGLE', 'APPLE', 'HOTMAIL' - para saber o tipo de cadastro da empresa
 
   // Relações
   estabelecimentos Estabelecimento[]
@@ -124,16 +125,17 @@ model Estabelecimento {
 }
 
 model Usuario {
-  UsuarioId         Int      @id @default(autoincrement())
-  UsuarioNome       String   @db.VarChar(100)
-  UsuarioTelefone   String   @db.VarChar(15)
-  UsuarioEmail      String   @db.VarChar(256)
-  UsuarioSenha      String
-  UsuarioTipo       UserType @default(CLIENTE)
-  UsuarioDtCriacao  DateTime @default(now())  
-  UsuarioStatus     UsuarioStatus @default(ATIVO)
-  UsuarioUltimoLogin DateTime?
-  UsuarioEnderecoId Int?    // Referente a tabela Endereco (Sem relacionamento direto, pois um edereço pode ser de um usuário ou de um estabelecimento)
+  UsuarioId           Int      @id @default(autoincrement())
+  UsuarioNome         String   @db.VarChar(100)
+  UsuarioTelefone     String   @db.VarChar(15)
+  UsuarioEmail        String   @db.VarChar(256)
+  UsuarioSenha        String?  // Senha pode ser nula para usuários que se autenticam via redes sociais (Google)
+  UsuarioTipo         UserType @default(CLIENTE)
+  UsuarioDtCriacao    DateTime @default(now())  
+  UsuarioStatus       UsuarioStatus @default(ATIVO)
+  UsuarioUltimoLogin  DateTime?
+  UsuarioEnderecoId   Int?    // Referente a tabela Endereco (Sem relacionamento direto, pois um edereço pode ser de um usuário ou de um estabelecimento)
+  UsuarioTipoCadastro String?  @db.VarChar(50) // 'NORMAL', 'GOOGLE', 'APPLE', 'HOTMAIL' - para saber o tipo de cadastro do usuário
 
   // Relações
   disponibilidades Disponibilidade[]
@@ -269,7 +271,7 @@ model Notificacao {
 
 model Log {
   LogId           String          @id @default(uuid())
-  UsuEmpId        UsuEmpRelacao?  // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao  alguns casos não será nenhum dos dois, como por exemplo, erros do sistema, etc
+  UsuEmpId        Int?            // Referente ao UsuarioId ou EmpresaId, dependendo do TipoRelacao  alguns casos não será nenhum dos dois, como por exemplo, erros do sistema, etc
   TipoRelacao     LogTipoRelacao  // 'USUARIO' ou 'EMPRESA' ou 'SISTEMA' ou outros tipos de relação
   LogAcao         String          @db.VarChar(20)
   LogDetalhe      String

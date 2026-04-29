@@ -1,5 +1,5 @@
 # Acesso ao BD PostGreSQL
-DATABASE_URL="postgresql://postgres:senha@ip-local:porta/nome_do_banco_de_dados?schema=public"
+DATABASE_URL="postgresql://usuario:senha@ip-local:porta/nome_do_banco_de_dados?schema=public"
 
 # Porta usada na API
 PORT=5000
@@ -8,3 +8,9 @@ PORT=5000
 NODE_ENV=development
 
 JWT_SECRET=seu-segredo-jwt-aqui
+
+PEPPER_SENHA_ADMIN=seu-segredo-jwt-aqui
+
+PEPPER_SENHA_USUARIO=seu-segredo-jwt-aqui
+
+GOOGLE_CLIENT_ID=seu-segredo-jwt-aqui

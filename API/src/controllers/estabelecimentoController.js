@@ -112,7 +112,7 @@ class EstabelecimentoController {
         } catch (error) {
             console.error('Erro ao criar estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao criar estabelecimento'
             });
         }
     }
@@ -187,7 +187,7 @@ class EstabelecimentoController {
         } catch (error) {
             console.error('Erro ao listar estabelecimentos:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar estabelecimentos'
             });
         }
     }
@@ -281,7 +281,7 @@ class EstabelecimentoController {
         } catch (error) {
             console.error('Erro ao buscar estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar estabelecimento'
             });
         }
     }
@@ -385,7 +385,7 @@ class EstabelecimentoController {
         } catch (error) {
             console.error('Erro ao atualizar estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar estabelecimento'
             });
         }
     }
@@ -456,7 +456,7 @@ class EstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao alterar status do estabelecimento:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao alterar status do estabelecimento' });
         }
     }
 
@@ -542,7 +542,7 @@ class EstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao vincular usuário:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao vincular usuário' });
         }
     }
 
@@ -613,7 +613,7 @@ class EstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao desvincular usuário:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao desvincular usuário' });
         }
     }
 
@@ -672,7 +672,7 @@ class EstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao listar usuários vinculados:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar usuários vinculados' });
         }
     }
 
@@ -755,7 +755,7 @@ class EstabelecimentoController {
             console.error('Erro ao listar vínculos:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao listar vínculos'
             });
         }
     }
@@ -857,7 +857,7 @@ class EstabelecimentoController {
             console.error('Erro ao solicitar vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao solicitar vínculo'
             });
         }
     }
@@ -920,7 +920,7 @@ class EstabelecimentoController {
             console.error('Erro ao aceitar vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao aceitar vínculo'
             });
         }
     }
@@ -982,7 +982,7 @@ class EstabelecimentoController {
             console.error('Erro ao recusar vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao recusar vínculo'
             });
         }
     }
@@ -1039,7 +1039,7 @@ class EstabelecimentoController {
             console.error('Erro ao desativar vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao desativar vínculo'
             });
         }
     }
@@ -1096,7 +1096,7 @@ class EstabelecimentoController {
             console.error('Erro ao reativar vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao reativar vínculo'
             });
         }
     }
@@ -1155,7 +1155,7 @@ class EstabelecimentoController {
                 }
             });
 
-            console.log('vinculoEst = ', vinculoEst)
+            //console.log('vinculoEst = ', vinculoEst)
 
             // Obter os serviços do estabelecimento e desvincular cada um deles
             if (vinculoEst) {
@@ -1163,7 +1163,7 @@ class EstabelecimentoController {
                     where: { EstabelecimentoId: vinculoEst.EstabelecimentoId }
                 });
 
-                console.log('sevicosestabelecimentos = ', sevicosEstabelecimentos)
+                //console.log('sevicosestabelecimentos = ', sevicosEstabelecimentos)
 
                 for (const servicoEstabelecimento of sevicosEstabelecimentos) {
                     await prisma.servico.updateMany({
@@ -1188,7 +1188,7 @@ class EstabelecimentoController {
             console.error('Erro ao excluir vínculo:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Erro ao excluir vínculo'
             });
         }
     }
@@ -1263,7 +1263,7 @@ class EstabelecimentoController {
 
         } catch (error) {
             console.error('Erro ao listar prestadores disponíveis:', error);
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json({ success: false, error: 'Erro ao listar prestadores disponíveis' });
         }
     }
 
@@ -1294,7 +1294,7 @@ class EstabelecimentoController {
                 }
             });
 
-            console.log('vinculos = ', vinculos)
+            //console.log('vinculos = ', vinculos)
 
             res.status(200).json({
                 success: true,
@@ -1302,7 +1302,7 @@ class EstabelecimentoController {
             });
         } catch (error) {
             console.error('Erro ao listar vínculos do prestador:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao listar vínculos do prestador' });
         }
     }
 

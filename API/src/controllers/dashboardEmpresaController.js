@@ -265,7 +265,7 @@ class DashboardEmpresaController {
         } catch (error) {
             console.error('Erro ao carregar dashboard da empresa:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao carregar dashboard da empresa'
             });
         }
     }
@@ -334,7 +334,7 @@ class DashboardEmpresaController {
         } catch (error) {
             console.error('Erro ao carregar resumo rápido da empresa:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao carregar resumo rápido da empresa'
             });
         }
     }

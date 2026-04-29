@@ -17,6 +17,7 @@ router.get('/empresa/agendamentos', agendamentoController.listarAgendamentosEmpr
 
 // Rotas de manipulação
 router.post('/', agendamentoController.cadastrarAgendamento); // Apenas CLIENTE
+router.post('/iniciar-agendamento', agendamentoController.iniciarAgendamento); // Apenas CLIENTE
 router.put('/:id/status', agendamentoController.atualizarStatus); // Cliente ou Prestador
 router.put('/:agendamentoId/cancelar', agendamentoController.cancelarAgendamento); // Cliente ou Prestador
 

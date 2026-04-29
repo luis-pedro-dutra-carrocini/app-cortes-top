@@ -2,17 +2,17 @@
 const express = require('express');
 const usuarioController = require('../controllers/usuarioController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { usuario } = require('../prisma');
 
 const router = express.Router();
 
 // Rotas públicas (não precisam de autenticação)
 router.post('/login', usuarioController.login);
 router.post('/cadastrar', usuarioController.cadastrarUsuario);
+router.post('/login/google', usuarioController.loginGoogle);
 
 // Rota para validar token - pode ser usada para verificar se o usuário está autenticado
-router.get('/validar-token', authMiddleware, (req, res) => {
-  res.json({ valid: true, usuario: req.usuario });
-});
+router.get('/validar-token', authMiddleware, usuarioController.validarUsuario);
 
 // Rota de busca por ID - pode ser pública ou restrita dependendo da sua regra de negócio
 // Se quiser que seja pública, remova o middleware

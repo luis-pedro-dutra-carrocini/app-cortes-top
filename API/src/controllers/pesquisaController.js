@@ -159,7 +159,7 @@ class PesquisaController {
 
         } catch (error) {
             console.error('Erro ao pesquisar prestadores:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao pesquisar prestadores' });
         }
     }
 
@@ -213,7 +213,7 @@ class PesquisaController {
 
         } catch (error) {
             console.error('Erro ao pesquisar empresas:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao pesquisar empresas' });
         }
     }
 
@@ -289,7 +289,7 @@ class PesquisaController {
 
         } catch (error) {
             console.error('Erro ao pesquisar estabelecimentos:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao pesquisar estabelecimentos' });
         }
     }
 
@@ -588,7 +588,7 @@ class PesquisaController {
             }
 
 
-            console.log('resultados = ', resultados);
+            //console.log('resultados = ', resultados);
 
             res.status(200).json({
                 success: true,
@@ -598,7 +598,7 @@ class PesquisaController {
 
         } catch (error) {
             console.error('Erro ao pesquisar todos:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao pesquisar todos' });
         }
     }
 

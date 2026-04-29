@@ -58,7 +58,7 @@ class ServicoController {
         } catch (error) {
             console.error('Erro ao cadastrar serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao cadastrar serviço'
             });
         }
     }
@@ -143,7 +143,7 @@ class ServicoController {
         } catch (error) {
             console.error('Erro ao listar serviços:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar serviços'
             });
         }
     }
@@ -230,7 +230,7 @@ class ServicoController {
         } catch (error) {
             console.error('Erro ao listar serviços:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar serviços'
             });
         }
     }
@@ -288,7 +288,7 @@ class ServicoController {
         } catch (error) {
             console.error('Erro ao buscar serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar serviço'
             });
         }
     }
@@ -377,7 +377,7 @@ class ServicoController {
         } catch (error) {
             console.error('Erro ao atualizar serviço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar serviço'
             });
         }
     }
@@ -446,7 +446,7 @@ class ServicoController {
 
         } catch (error) {
             console.error('Erro ao excluir serviço:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao excluir serviço' });
         }
     }
 
@@ -540,7 +540,7 @@ class ServicoController {
 
         } catch (error) {
             console.error('Erro ao alterar status do serviço:', error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: 'Erro ao alterar status do serviço' });
         }
     }
 }

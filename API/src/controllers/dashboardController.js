@@ -78,8 +78,8 @@ class DashboardController {
                     agrupamento = 'mês';
             }
 
-            console.log('dataInicio = ', dataInicio);
-            console.log('dataFim = ', dataFim);
+            //console.log('dataInicio = ', dataInicio);
+            //console.log('dataFim = ', dataFim);
 
             // Buscar disponibilidades do prestador no período
             const disponibilidades = await prisma.disponibilidade.findMany({
@@ -92,7 +92,7 @@ class DashboardController {
                 }
             });
 
-            console.log('disponibilidades = ', disponibilidades);
+            //console.log('disponibilidades = ', disponibilidades);
 
             // Buscar agendamentos do prestador no período
             const agendamentos = await prisma.agendamento.findMany({
@@ -328,7 +328,7 @@ class DashboardController {
             };
 
             //console.log('servicosMaisSolicitados = ', servicosMaisSolicitados);
-            console.log('resposta = ', resposta);
+            //console.log('resposta = ', resposta);
 
             res.status(200).json({
                 message: 'Dashboard carregado com sucesso',
@@ -338,7 +338,7 @@ class DashboardController {
         } catch (error) {
             console.error('Erro ao carregar dashboard:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao carregar dashboard'
             });
         }
     }
@@ -377,8 +377,8 @@ class DashboardController {
             const fimHoje = new Date(`${dataString2}T20:59:59-03:00`);
 
             //console.log('Data string:', dataString);
-            console.log('Início do dia:', inicioHoje.toISOString());
-            console.log('Fim do dia:', fimHoje.toISOString());
+            //console.log('Início do dia:', inicioHoje.toISOString());
+            //console.log('Fim do dia:', fimHoje.toISOString());
 
             // Agendamentos de hoje
             const agendamentosHoje = await prisma.agendamento.findMany({
@@ -406,7 +406,7 @@ class DashboardController {
                 }
             });
 
-            console.log('disponibilidadesHojeDisp = ', disponibilidadesHojeDisp);
+            //console.log('disponibilidadesHojeDisp = ', disponibilidadesHojeDisp);
 
             const horasFormatadasDisp = formatarHoras(disponibilidadesHojeDisp);
 
@@ -422,7 +422,7 @@ class DashboardController {
                 }
             });
 
-            console.log('disponibilidadesHojeRes = ', disponibilidadesHojeRes);
+            //console.log('disponibilidadesHojeRes = ', disponibilidadesHojeRes);
 
             const horasFormatadasRes = formatarHoras(disponibilidadesHojeRes);
 
@@ -457,7 +457,7 @@ class DashboardController {
         } catch (error) {
             console.error('Erro ao carregar resumo rápido:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao carregar resumo rápido'
             });
         }
     }

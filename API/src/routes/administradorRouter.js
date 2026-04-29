@@ -11,4 +11,6 @@ router.post('/login', administradorController.login);
 // Todas as rotas de agendamento exigem autenticação (usuário logado)
 router.use(authMiddleware);
 
+router.get('/dashboard', administradorController.getDashboardData);
+
 module.exports = router;

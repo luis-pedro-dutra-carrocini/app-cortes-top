@@ -78,7 +78,7 @@ class ServicoPrecoController {
         } catch (error) {
             console.error('Erro ao adicionar preço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao adicionar preço'
             });
         }
     }
@@ -170,7 +170,7 @@ class ServicoPrecoController {
         } catch (error) {
             console.error('Erro ao listar preços:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao listar preços'
             });
         }
     }
@@ -218,7 +218,7 @@ class ServicoPrecoController {
         } catch (error) {
             console.error('Erro ao buscar preço:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar preço'
             });
         }
     }
@@ -302,7 +302,7 @@ class ServicoPrecoController {
         } catch (error) {
             console.error('Erro ao buscar preço atual:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao buscar preço atual'
             });
         }
     }
@@ -421,7 +421,7 @@ class ServicoPrecoController {
         } catch (error) {
             console.error('Erro ao atualizar preço do serviço do estabelecimento:', error);
             res.status(500).json({
-                error: error.message
+                error: 'Erro ao atualizar preço do serviço do estabelecimento'
             });
         }
     }

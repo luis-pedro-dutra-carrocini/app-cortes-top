@@ -3,11 +3,15 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
 
+const allowedOrigins = [process.env.CORS_ORIGIN];
+//console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
+
 const corsOptions = {
-    origin: 'http://localhost:3001',
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Inclua OPTIONS
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -23,7 +27,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
