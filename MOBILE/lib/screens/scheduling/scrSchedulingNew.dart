@@ -16,6 +16,7 @@ class NovoAgendamentoScreen extends StatefulWidget {
   final int? estabelecimentoId;
   final String? estabelecimentoNome;
   final int? empresaId;
+  final String? uuid;
 
   const NovoAgendamentoScreen({
     super.key,
@@ -24,6 +25,7 @@ class NovoAgendamentoScreen extends StatefulWidget {
     this.estabelecimentoId,
     this.estabelecimentoNome,
     this.empresaId,
+    this.uuid = '',
   });
 
   @override
@@ -187,7 +189,7 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao carregar últimas empresas: $e');
+      //print('Erro ao carregar últimas empresas: $e');
     }
   }
 
@@ -598,6 +600,7 @@ class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
         observacao: _observacaoController.text.isNotEmpty
             ? _observacaoController.text
             : null,
+        uuid: widget.uuid, // <-- Passando o UUID para o serviço
       );
 
       if (mounted) {

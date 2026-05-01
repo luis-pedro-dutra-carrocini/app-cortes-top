@@ -54,9 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   final AgendamentoService _agendamentoService =
-      AgendamentoService(); // Você precisará criar este serviço
+      AgendamentoService();
   List<dynamic> _agendamentosPendentes = [];
   bool _carregandoAgendamentos = false;
+  String _uuid = '';
 
   Color _getStatusColor(String? status) {
     switch (status) {
@@ -109,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao carregar resumo: $e');
+      //print('Erro ao carregar resumo: $e');
       setState(() {
         _carregandoResumo = false;
       });
@@ -136,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao carregar resumo da empresa: $e');
+      //print('Erro ao carregar resumo da empresa: $e');
       setState(() {
         _carregandoResumo = false;
       });
@@ -191,7 +192,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /*
   void _mostrarSnackBar(String mensagem, Color cor) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -202,9 +202,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  */
 
-  void _navegarPara(String opcao) {
+  void _navegarPara(String opcao) async {
     if (opcao == 'Gerenciar Conta') {
       Navigator.push(
         context,
@@ -225,15 +224,72 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else if (opcao == 'Iniciar novo Agendamento') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NovoAgendamentoScreen()),
-      ).then((_) {
-        // Recarregar os agendamentos pendentes quando voltar da tela de agendamento
-        if (_usuario.tipo == 'CLIENTE') {
-          _carregarAgendamentosPendentes();
+      try {
+        final usuarioProvider = Provider.of<UsuarioProvider>(
+          context,
+          listen: false,
+        );
+        final token = usuarioProvider.token;
+
+        if (token == null) return;
+
+        final result = await _agendamentoService.iniciarAgendamento(
+          token: token,
+          tela: 'MOBILE_BTNTELAHOME',
+        );
+
+        if (mounted && result['success']) {
+          _uuid = result['uuid'].toString();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => NovoAgendamentoScreen(uuid: _uuid,),
+            ),
+          ).then((_) {
+            // Recarregar os agendamentos pendentes quando voltar da tela de agendamento
+            if (_usuario.tipo == 'CLIENTE') {
+              _carregarAgendamentosPendentes();
+            }
+          });
         }
-      });
+      } catch (e) {
+        if (mounted) {
+          _mostrarSnackBar('Erro: $e', Colors.red);
+        }
+      }
+    } else if (opcao == 'Iniciar novo Agendamento Centro') {
+      try {
+        final usuarioProvider = Provider.of<UsuarioProvider>(
+          context,
+          listen: false,
+        );
+        final token = usuarioProvider.token;
+
+        if (token == null) return;
+
+        await _agendamentoService.iniciarAgendamento(
+          token: token,
+          tela: 'MOBILE_BTNCENTRAL',
+        );
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => NovoAgendamentoScreen(uuid: _uuid,),
+            ),
+          ).then((_) {
+            // Recarregar os agendamentos pendentes quando voltar da tela de agendamento
+            if (_usuario.tipo == 'CLIENTE') {
+              _carregarAgendamentosPendentes();
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          _mostrarSnackBar('Erro: $e', Colors.red);
+        }
+      }
     } else if (opcao == 'Gerenciar Agendamentos') {
       Navigator.push(
         context,
@@ -494,7 +550,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: Text(
                                       isPrestador
                                           ? 'Prestador de Serviços'
-                                          : isEmpresa ? 'Empresa' : 'Cliente',
+                                          : isEmpresa
+                                          ? 'Empresa'
+                                          : 'Cliente',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 12,
@@ -569,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Título da seção
                   Text(
-                    isPrestador ? 'Menu do Prestador' : 'Menu do Cliente',
+                    isPrestador ? 'Menu do Prestador' : isEmpresa ? 'Menu da Empresa' : 'Menu do Cliente',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1059,9 +1117,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-              // Novo - visível para todos
+              // Novo - visível para clientes
               if (!isPrestador && !isEmpresa)
-                _buildNavItem(Icons.add_circle, 'Novo', false, isFAB: true),
+                _buildNavItem(
+                  Icons.add_circle,
+                  'Novo',
+                  false,
+                  isFAB: true,
+                  onTap: () {
+                    _navegarPara('Iniciar novo Agendamento Centro');
+                  },
+                ),
 
               // Histórico - visível apenas para não prestadores
               if (!isPrestador && !isEmpresa)

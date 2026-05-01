@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cortes_top/services/serApi.dart';
 import 'package:provider/provider.dart';
-import '../services/serApi.dart';
-import '../models/modUser.dart';
 import '../services/serAuth.dart';
+import '../services/serAuthSocial.dart';
+import '../models/modUser.dart';
 import '../providers/proUser.dart';
 import 'scrUserRegister.dart';
 import 'scrHome.dart';
@@ -17,6 +18,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
+  final SocialAuthService _socialAuthService = SocialAuthService();
 
   // Controladores dos campos de texto
   final _formKey = GlobalKey<FormState>();
@@ -26,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _obscureSenha = true;
-  bool _lembrarUsuario = false;
+  //bool _lembrarUsuario = false;
   bool _mostrarSelecaoTipo = true;
 
   final ApiService _apiService = ApiService();
@@ -102,6 +104,68 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Widget para as opções de rádio no modal
+  Widget _buildModalTipoRadio({
+    required String value,
+    required String label,
+    required IconData icon,
+    required String? selectedValue,
+    required Function(String) onChanged,
+  }) {
+    return GestureDetector(
+      onTap: () => onChanged(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: selectedValue == value
+              ? const Color(0xFF4A5C6B).withOpacity(0.1)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selectedValue == value
+                ? const Color(0xFF4A5C6B)
+                : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selectedValue == value
+                  ? const Color(0xFF4A5C6B)
+                  : Colors.grey,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: selectedValue == value
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: selectedValue == value
+                      ? const Color(0xFF4A5C6B)
+                      : Colors.black87,
+                ),
+              ),
+            ),
+            Radio<String>(
+              value: value,
+              groupValue: selectedValue,
+              onChanged: (newValue) {
+                if (newValue != null) {
+                  onChanged(newValue);
+                }
+              },
+              activeColor: const Color(0xFF4A5C6B),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _fazerLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -138,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      print('Erro detalhado: $e');
+      //print('Erro detalhado: $e');
       if (mounted) {
         _mostrarDialogErro('Erro ao fazer login: ${e.toString()}');
       }
@@ -150,6 +214,227 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
+
+  // Método modificado para iniciar o processo de login com Google
+  Future<void> _loginWithGoogle() async {
+    // Primeiro mostra o modal para selecionar o tipo
+    await _mostrarModalSelecionarTipo();
+  }
+
+  // Novo método para continuar com o login após selecionar o tipo
+  Future<void> _continuarLoginComGoogle(String tipoUsuario) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Obter token do Google
+      final googleResult = await _socialAuthService.loginWithGoogle();
+
+      if (!googleResult['success']) {
+        if (mounted) {
+          _mostrarDialogErro(googleResult['error']);
+        }
+        return;
+      }
+
+      // Enviar token para o backend com o tipo selecionado
+      final result = await _apiService.loginWithGoogle(
+        googleToken: googleResult['token'],
+        tipo: tipoUsuario, // Usando o tipo selecionado no modal
+        tipoRequisicao: 'LOGIN',
+      );
+
+      if (mounted) {
+        if (result['success']) {
+          final usuario = result['usuario'] as Usuario;
+          final token = result['token'] as String;
+
+          await _authService.saveUserData(token, usuario);
+
+          final usuarioProvider = Provider.of<UsuarioProvider>(
+            context,
+            listen: false,
+          );
+          usuarioProvider.setUsuario(usuario, token);
+
+          _mostrarDialogSucesso(usuario, token);
+        } else {
+          _mostrarDialogErro(result['message']);
+        }
+      }
+    } catch (e) {
+      print('Erro no login com Google: $e');
+      if (mounted) {
+        _mostrarDialogErro('Erro ao fazer login com Google: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Adicione este método para mostrar o modal de seleção de tipo
+  Future<void> _mostrarModalSelecionarTipo() async {
+    String? tipoSelecionado;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text(
+                'Selecionar Tipo de Acesso',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A5C6B),
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Como você deseja acessar o sistema?',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  // Opção Cliente
+                  _buildModalTipoRadio(
+                    value: 'CLIENTE',
+                    label: 'Cliente',
+                    icon: Icons.person,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Opção Prestador
+                  _buildModalTipoRadio(
+                    value: 'PRESTADOR',
+                    label: 'Prestador',
+                    icon: Icons.work_outline,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Opção Empresa
+                  _buildModalTipoRadio(
+                    value: 'EMPRESA',
+                    label: 'Empresa',
+                    icon: Icons.business,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Cancelar',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: tipoSelecionado == null
+                      ? null
+                      : () {
+                          Navigator.pop(context, tipoSelecionado);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A5C6B),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Continuar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((selectedType) async {
+      if (selectedType != null) {
+        // Se o usuário selecionou um tipo, continua com o login do Google
+        await _continuarLoginComGoogle(selectedType);
+      }
+    });
+  }
+
+  /*
+  Future<void> _loginWithApple() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Obter token da Apple
+      final appleResult = await _socialAuthService.loginWithApple();
+
+      if (!appleResult['success']) {
+        if (mounted) {
+          _mostrarDialogErro(appleResult['error']);
+        }
+        return;
+      }
+
+      // Para Apple, você precisará de um endpoint similar no backend
+      // ou pode reutilizar o mesmo endpoint do Google
+      final result = await _apiService.loginWithGoogle(
+        googleToken: appleResult['token'], // Adaptar para token da Apple
+        tipo: _tipoUsuario,
+      );
+
+      if (mounted) {
+        if (result['success']) {
+          final usuario = result['usuario'] as Usuario;
+          final token = result['token'] as String;
+
+          await _authService.saveUserData(token, usuario);
+
+          final usuarioProvider = Provider.of<UsuarioProvider>(
+            context,
+            listen: false,
+          );
+          usuarioProvider.setUsuario(usuario, token);
+
+          _mostrarDialogSucesso(usuario, token);
+        } else {
+          _mostrarDialogErro(result['message']);
+        }
+      }
+    } catch (e) {
+      print('Erro no login com Apple: $e');
+      if (mounted) {
+        _mostrarDialogErro('Erro ao fazer login com Apple: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  */
 
   void _mostrarDialogSucesso(Usuario usuario, String token) {
     // Salvar dados antes de navegar
@@ -399,35 +684,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                 ],
 
                 // Opções adicionais
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Checkbox "Lembrar usuário"
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _lembrarUsuario,
-                          onChanged: (value) {
-                            setState(() {
-                              _lembrarUsuario = value ?? false;
-                            });
-                          },
-                          activeColor: const Color(0xFF4A5C6B),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const Text(
-                          'Lembrar-me',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-
                     // Link "Esqueceu a senha?"
                     TextButton(
                       onPressed: () {
@@ -444,7 +707,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
 
                 // Botão Login
                 ElevatedButton(
@@ -501,15 +764,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Opções de login social (opcional)
                 // Botão Google
                 OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Implementar login com Google
-                  },
+                  onPressed: _isLoading ? null : _loginWithGoogle,
                   icon: Image.asset(
-                    'assets/google_logo.png', // Você precisará adicionar esta imagem
+                    'assets/google_logo.png',
                     height: 24,
                     width: 24,
                     errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.g_mobiledata),
+                        const Icon(Icons.g_mobiledata, size: 24),
                   ),
                   label: const Text(
                     'Continuar com Google',

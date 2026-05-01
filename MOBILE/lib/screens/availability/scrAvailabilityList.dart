@@ -80,9 +80,9 @@ class _ListaDisponibilidadeScreenState
             _isLoading = false;
           });
 
-          print(
-            'Disponibilidades carregadas: ${_disponibilidadesAgrupadas.length}',
-          );
+          //print(
+          //  'Disponibilidades carregadas: ${_disponibilidadesAgrupadas.length}',
+          //);
         } else {
           setState(() {
             _errorMessage = result['message'];

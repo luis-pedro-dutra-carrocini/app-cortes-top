@@ -136,7 +136,7 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
 
       if (token == null) return;
 
-      print('Buscando disponibilidades para data: $_dataSelecionada');
+      //print('Buscando disponibilidades para data: $_dataSelecionada');
 
       final result = await _prestadorService.buscarDisponibilidadesPrestador(
         prestadorId: _agendamento.prestadorId,
@@ -148,7 +148,7 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
         if (result['success']) {
           final List<Disponibilidade> disponibilidades = result['data'] ?? [];
 
-          print('Disponibilidades recebidas: ${disponibilidades.length}');
+          //print('Disponibilidades recebidas: ${disponibilidades.length}');
 
           // Extrair horários disponíveis com ID (status true)
           List<Map<String, dynamic>> horarios = [];
@@ -164,7 +164,7 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
             }
           }
 
-          print('Horários da API: $horarios');
+          //print('Horários da API: $horarios');
 
           // VARIÁVEIS PARA CONTROLE
           bool isDataOriginal = _dataSelecionada == _agendamento.dataServico;
@@ -174,9 +174,9 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
 
           // SOLUÇÃO: Forçar a inclusão do horário original se for a data original
           if (isDataOriginal && !horarioOriginalEstaNaLista) {
-            print(
-              'Forçando inclusão do horário original: ${_agendamento.horaServico}',
-            );
+            //print(
+            //  'Forçando inclusão do horário original: ${_agendamento.horaServico}',
+            //);
             horarios.add({
               'id': _agendamento.disponibilidadeId,
               'hora': _agendamento.horaServico,
@@ -206,7 +206,7 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
               idParaSelecionar = horarioOriginal['id'] as int?;
             }
 
-            print('Data original - Forçando seleção: $horarioParaSelecionar');
+            //print('Data original - Forçando seleção: $horarioParaSelecionar');
           } else {
             // CASO 2: Data diferente - tentar manter seleção anterior se ainda disponível
             if (_horaSelecionada != null) {
@@ -221,9 +221,9 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
                 );
                 idParaSelecionar = horarioEncontrado['id'] as int?;
 
-                print('Mantendo seleção anterior: $horarioParaSelecionar');
+                //print('Mantendo seleção anterior: $horarioParaSelecionar');
               } else {
-                print('Horário anterior não disponível, limpando seleção');
+                //print('Horário anterior não disponível, limpando seleção');
               }
             }
           }
@@ -243,9 +243,9 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
             _carregandoHorarios = false;
           });
 
-          print('Horários finais: $_horariosDisponiveis');
-          print('Horário selecionado: $_horaSelecionada');
-          print('ID selecionado: $_disponibilidadeIdSelecionada');
+          //print('Horários finais: $_horariosDisponiveis');
+          //print('Horário selecionado: $_horaSelecionada');
+          //print('ID selecionado: $_disponibilidadeIdSelecionada');
         } else {
           setState(() {
             _carregandoHorarios = false;
@@ -254,7 +254,7 @@ class _SchedulingEditScreenState extends State<EditarAgendamentoScreen> {
         }
       }
     } catch (e) {
-      print('Erro ao carregar horários: $e');
+      //print('Erro ao carregar horários: $e');
       if (mounted) {
         setState(() {
           _carregandoHorarios = false;

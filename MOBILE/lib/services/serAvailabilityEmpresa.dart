@@ -42,7 +42,7 @@ class AvailabilityEmpresaService {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200) {
-        print('Resposta da API: ${response.body}');
+        //print('Resposta da API: ${response.body}');
         List<Disponibilidade> disponibilidades = [];
         if (responseData['data'] != null) {
           disponibilidades = (responseData['data'] as List)

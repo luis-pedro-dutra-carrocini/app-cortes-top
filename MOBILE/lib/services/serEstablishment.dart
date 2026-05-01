@@ -168,7 +168,7 @@ class EstabelecimentoService {
       if (cep != null)
         body['EnderecoCEP'] = cep.replaceAll(RegExp(r'[^0-9]'), '');
 
-      print('Enviando atualização: $body'); // LOG
+      //print('Enviando atualização: $body'); // LOG
 
       final response = await http.put(
         Uri.parse('$baseUrl/$estabelecimentoId'),
@@ -177,7 +177,7 @@ class EstabelecimentoService {
       );
 
       final responseData = json.decode(response.body);
-      print('Resposta: $responseData'); // LOG
+      //print('Resposta: $responseData'); // LOG
 
       if (response.statusCode == 200) {
         return {
@@ -195,7 +195,7 @@ class EstabelecimentoService {
         };
       }
     } catch (e) {
-      print('Erro no service: $e');
+      //print('Erro no service: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }

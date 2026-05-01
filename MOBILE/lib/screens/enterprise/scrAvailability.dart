@@ -143,9 +143,9 @@ class _DisponibilidadesEmpresaScreenState
           'Content-Type': 'application/json',
         },
       );
-      print(
-        '${ApiConfig.baseUrl}estabelecimento/${widget.estabelecimentoId}/usuarios',
-      );
+      //print(
+      //  '${ApiConfig.baseUrl}estabelecimento/${widget.estabelecimentoId}/usuarios',
+      //);
 
       final data = json.decode(response.body);
       if (response.statusCode == 200 && data['success'] == true) {
@@ -156,7 +156,7 @@ class _DisponibilidadesEmpresaScreenState
         });
       }
     } catch (e) {
-      print('Erro ao carregar prestadores: $e');
+      //print('Erro ao carregar prestadores: $e');
     }
   }
 

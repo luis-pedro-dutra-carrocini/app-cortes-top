@@ -1,3 +1,5 @@
+// ignore_for_file: duplicate_ignore, unused_field
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
@@ -73,6 +75,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   String _formatarCNPJ(String cnpj) {
+    if (cnpj.isEmpty) return 'CNPJ não cadastrado';
     String limpo = cnpj.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
     if (limpo.length == 14) {
       return '${limpo.substring(0, 2)}.${limpo.substring(2, 5)}.${limpo.substring(5, 8)}/${limpo.substring(8, 12)}-${limpo.substring(12)}';
@@ -96,11 +99,151 @@ class _PerfilScreenState extends State<PerfilScreen> {
   bool _isEditing = false;
   bool _obscureSenha = true;
   bool _obscureConfirmarSenha = true;
-  // ignore: unused_field
   bool _confirmarExclusao = false;
 
   final UsuarioService _usuarioService = UsuarioService();
   final AuthService _authService = AuthService();
+
+  // Variáveis para controle de validação em tempo real
+  bool _telefoneValido = true;
+  bool _cnpjValido = true;
+  bool _enderecoValido = true;
+
+  bool _mostrarAlertaSempre = true; // Mostrar alerta mesmo sem edição
+
+  // Lista de mensagens de erro para exibir no alerta
+  List<String> _mensagensAlerta = [];
+
+  void _validarCamposEmTempoReal() {
+    List<String> mensagens = [];
+
+    // Validar telefone (obrigatório para todos os tipos)
+    String telefone = _telefoneController.text.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    bool telefoneOk = telefone.length >= 10 && telefone.length <= 11;
+
+    if (!telefoneOk && telefone.isNotEmpty) {
+      mensagens.add('• Telefone deve ter 10 ou 11 dígitos (incluindo DDD)');
+    } else if (telefone.isEmpty) {
+      mensagens.add('• Telefone é obrigatório');
+    }
+
+    // Validações específicas por tipo
+    if (_usuario.tipo == 'CLIENTE') {
+      // Cliente: apenas telefone é obrigatório
+      _telefoneValido = telefoneOk && telefone.isNotEmpty;
+    } else if (_usuario.tipo == 'PRESTADOR') {
+      // Prestador: telefone + endereço completo
+      String cep = _cepController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      bool cepOk = cep.length == 8;
+
+      // Obter valores dos controllers corretamente
+      String rua = _ruaController.text.trim();
+      String numero = _numeroController.text.trim();
+      String bairro = _bairroController.text.trim();
+      String cidade = _cidadeController.text.trim();
+      String estado = _estadoController.text.trim();
+
+      bool ruaOk = rua.isNotEmpty;
+      bool numeroOk = numero.isNotEmpty;
+      bool bairroOk = bairro.isNotEmpty;
+      bool cidadeOk = cidade.isNotEmpty;
+      bool estadoOk = estado.length == 2;
+
+      _telefoneValido = telefoneOk && telefone.isNotEmpty;
+      _enderecoValido =
+          cepOk && ruaOk && numeroOk && bairroOk && cidadeOk && estadoOk;
+
+      if (telefone.isEmpty) {
+        mensagens.add('• Telefone é obrigatório');
+      } else if (!telefoneOk) {
+        mensagens.add('• Telefone deve ter 10 ou 11 dígitos (incluindo DDD)');
+      }
+
+      if (cep.isEmpty) {
+        mensagens.add('• CEP é obrigatório');
+      } else if (!cepOk) {
+        mensagens.add('• CEP inválido (deve ter 8 números)');
+      }
+
+      if (rua.isEmpty) {
+        mensagens.add('• Rua é obrigatória');
+      }
+      if (numero.isEmpty) {
+        mensagens.add('• Número é obrigatório');
+      }
+      if (bairro.isEmpty) {
+        mensagens.add('• Bairro é obrigatório');
+      }
+      if (cidade.isEmpty) {
+        mensagens.add('• Cidade é obrigatória');
+      }
+      if (estado.isEmpty) {
+        mensagens.add('• Estado é obrigatório (2 letras)');
+      } else if (!estadoOk) {
+        mensagens.add('• Estado deve ter 2 letras');
+      }
+    } else if (_usuario.tipo == 'EMPRESA') {
+      // Empresa: telefone + CNPJ
+      String cnpj = _cnpjController.text.replaceAll(
+        RegExp(r'[^A-Za-z0-9]'),
+        '',
+      );
+      bool cnpjOk = cnpj.length == 14;
+
+      _telefoneValido = telefoneOk && telefone.isNotEmpty;
+      _cnpjValido = cnpjOk;
+
+      if (telefone.isEmpty) {
+        mensagens.add('• Telefone é obrigatório');
+      } else if (!telefoneOk) {
+        mensagens.add('• Telefone deve ter 10 ou 11 dígitos (incluindo DDD)');
+      }
+
+      if (cnpj.isEmpty) {
+        mensagens.add('• CNPJ é obrigatório');
+      } else if (!cnpjOk) {
+        mensagens.add('• CNPJ deve ter 14 caracteres');
+      }
+    }
+
+    setState(() {
+      _mensagensAlerta = mensagens;
+    });
+  }
+
+  // Método para verificar se o botão salvar deve ser habilitado
+  bool _isFormValido() {
+    String telefone = _telefoneController.text.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    bool telefoneOk =
+        telefone.length >= 10 && telefone.length <= 11 && telefone.isNotEmpty;
+
+    if (!telefoneOk) return false;
+
+    if (_usuario.tipo == 'PRESTADOR') {
+      String cep = _cepController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      return cep.length == 8 &&
+          cep.isNotEmpty &&
+          _ruaController.text.trim().isNotEmpty &&
+          _numeroController.text.trim().isNotEmpty &&
+          _bairroController.text.trim().isNotEmpty &&
+          _cidadeController.text.trim().isNotEmpty &&
+          _estadoController.text.length == 2;
+    } else if (_usuario.tipo == 'EMPRESA') {
+      String cnpj = _cnpjController.text.replaceAll(
+        RegExp(r'[^A-Za-z0-9]'),
+        '',
+      );
+      return cnpj.length == 14 && cnpj.isNotEmpty;
+    }
+
+    return true;
+  }
 
   @override
   void initState() {
@@ -108,6 +251,28 @@ class _PerfilScreenState extends State<PerfilScreen> {
     _usuario = widget.usuario;
     _token = widget.token;
     _preencherCampos();
+    _adicionarListeners();
+
+    // Validar campos imediatamente ao carregar a tela
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _validarCamposEmTempoReal();
+    });
+  }
+
+  void _adicionarListeners() {
+    // Adicionar listeners para validação em tempo real
+    _telefoneController.addListener(_validarCamposEmTempoReal);
+
+    if (_usuario.tipo == 'PRESTADOR') {
+      _cepController.addListener(_validarCamposEmTempoReal);
+      _ruaController.addListener(_validarCamposEmTempoReal);
+      _numeroController.addListener(_validarCamposEmTempoReal);
+      _bairroController.addListener(_validarCamposEmTempoReal);
+      _cidadeController.addListener(_validarCamposEmTempoReal);
+      _estadoController.addListener(_validarCamposEmTempoReal);
+    } else if (_usuario.tipo == 'EMPRESA') {
+      _cnpjController.addListener(_validarCamposEmTempoReal);
+    }
   }
 
   void _preencherCampos() {
@@ -136,6 +301,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
     _emailController.dispose();
     _senhaController.dispose();
     _confirmarSenhaController.dispose();
+
+    // Remover listeners
+    _telefoneController.removeListener(_validarCamposEmTempoReal);
+
+    if (_usuario.tipo == 'PRESTADOR') {
+      _cepController.removeListener(_validarCamposEmTempoReal);
+      _ruaController.removeListener(_validarCamposEmTempoReal);
+      _numeroController.removeListener(_validarCamposEmTempoReal);
+      _bairroController.removeListener(_validarCamposEmTempoReal);
+      _cidadeController.removeListener(_validarCamposEmTempoReal);
+      _estadoController.removeListener(_validarCamposEmTempoReal);
+    } else if (_usuario.tipo == 'EMPRESA') {
+      _cnpjController.removeListener(_validarCamposEmTempoReal);
+    }
+
     super.dispose();
   }
 
@@ -217,6 +397,15 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Future<void> _salvarAlteracoes() async {
+    // Validar novamente antes de salvar
+    if (!_isFormValido()) {
+      _mostrarSnackBar(
+        'Preencha todos os campos obrigatórios corretamente',
+        Colors.orange,
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -566,6 +755,58 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       ),
                     ),
 
+                    // Widget de alerta fixo (somente quando há mensagens)
+                    if (_mensagensAlerta.isNotEmpty) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.red.shade700,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Atenção! Complete o cadastro com os campos abaixo:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ..._mensagensAlerta.map(
+                                    (mensagem) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        mensagem,
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     // Campos do formulário
                     _buildTextField(
                       controller: _nomeController,
@@ -612,7 +853,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       controller: _emailController,
                       label: 'E-mail',
                       icon: Icons.email_outlined,
-                      enabled: _isEditing,
+                      enabled: _usuario.tipoCadastro == 'NORMAL'
+                          ? _isEditing
+                          : false,
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -970,10 +1213,10 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Divider()
+                      const Divider(),
                     ],
 
-                    if (_isEditing) ...[
+                    if (_isEditing && _usuario.tipoCadastro == 'NORMAL') ...[
                       const SizedBox(height: 8),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1075,7 +1318,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _salvarAlteracoes,
+                              onPressed: (_isLoading || !_isFormValido())
+                                  ? null
+                                  : _salvarAlteracoes,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4A5C6B),
                                 foregroundColor: Colors.white,
@@ -1085,6 +1330,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                disabledBackgroundColor: Colors.grey.shade400,
                               ),
                               child: _isLoading
                                   ? const SizedBox(
@@ -1109,26 +1355,52 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         ],
                       ),
                     ] else ...[
-                      // Botão de editar (só aparece quando não está editando)
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _isEditing = true;
-                          });
-                        },
-                        icon: const Icon(Icons.edit, color: Color(0xFF4A5C6B)),
-                        label: const Text(
-                          'Editar meu perfil',
-                          style: TextStyle(color: Color(0xFF4A5C6B)),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: Color(0xFF4A5C6B)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      if (!_isEditing && _mensagensAlerta.isNotEmpty) ...[
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isEditing = true;
+                            });
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text(
+                            'Completar Cadastro',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4A5C6B),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        // Botão de editar (só aparece quando não está editando)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isEditing = true;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.edit,
+                            color: Color(0xFF4A5C6B),
+                          ),
+                          label: const Text(
+                            'Editar meu perfil',
+                            style: TextStyle(color: Color(0xFF4A5C6B)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(color: Color(0xFF4A5C6B)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 15),
 

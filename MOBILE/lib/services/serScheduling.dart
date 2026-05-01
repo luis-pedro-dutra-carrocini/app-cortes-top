@@ -4,6 +4,49 @@ import '../config/conApi.dart';
 import '../models/modScheduling.dart';
 
 class AgendamentoService {
+
+  // Iniciar agendamento, acessando a tela de cadastro de agendamento, mas ainda não efetivado o agendamento
+  Future<Map<String, dynamic>> iniciarAgendamento({
+    required String token,
+    required String tela,
+  }) async {
+    try {
+      final Map<String, dynamic> body = {};
+
+      //print('Tela de origem: $tela'); // Log para debug
+      body['Tela'] = tela;
+
+      final response = await http.post(
+        Uri.parse(
+          '${ApiConfig.baseUrl}${ApiConfig.agendamentoEndpoint}/iniciar-agendamento',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(body),
+      );
+
+      final responseData = json.decode(response.body);
+      //print('Resposta do início de agendamento: $responseData'); // Log para debug
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'tela': responseData['tela'],
+          'uuid': responseData['uuid'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['error'] ?? 'Erro ao iniciar agendamento',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
   // Cadastrar novo agendamento
   Future<Map<String, dynamic>> cadastrarAgendamento({
     required String token,
@@ -13,6 +56,7 @@ class AgendamentoService {
     required String horaServico,
     required List<int> servicos,
     String? observacao,
+    String? uuid, // Novo parâmetro para o UUID
   }) async {
     try {
       final response = await http.post(
@@ -28,6 +72,7 @@ class AgendamentoService {
           'AgendamentoHoraServico': horaServico,
           'AgendamentoObservacao': observacao,
           'servicos': servicos,
+          'uuid': uuid, // Incluir o UUID no corpo da requisição
         }),
       );
 
@@ -243,7 +288,7 @@ class AgendamentoService {
         body['servicos'] = servicos;
       }
 
-      print('Enviando atualização: $body'); // Log para debug
+      //print('Enviando atualização: $body'); // Log para debug
 
       final response = await http.put(
         Uri.parse(
@@ -257,7 +302,7 @@ class AgendamentoService {
       );
 
       final responseData = json.decode(response.body);
-      print('Resposta: $responseData'); // Log para debug
+      //print('Resposta: $responseData'); // Log para debug
 
       if (response.statusCode == 200) {
         return {
@@ -273,7 +318,7 @@ class AgendamentoService {
         };
       }
     } catch (e) {
-      print('Erro: $e');
+      //print('Erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
@@ -321,4 +366,5 @@ class AgendamentoService {
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
+
 }

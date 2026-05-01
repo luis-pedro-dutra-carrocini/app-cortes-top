@@ -8,10 +8,10 @@ class ApiService {
     Map<String, dynamic> dados,
   ) async {
     try {
-      print(
-        'Enviando requisição para: ${ApiConfig.baseUrl}${ApiConfig.usuarioEndpoint}cadastrar',
-      );
-      print('Dados: $dados');
+      //print(
+      //  'Enviando requisição para: ${ApiConfig.baseUrl}${ApiConfig.usuarioEndpoint}cadastrar',
+      //);
+      //print('Dados: $dados');
 
       // Mapear os campos para o formato esperado pelo backend
       final Map<String, dynamic> body = {
@@ -62,8 +62,8 @@ class ApiService {
           )
           .timeout(const Duration(seconds: 10));
 
-      print('Status code: ${response.statusCode}');
-      print('Resposta: ${response.body}');
+      //print('Status code: ${response.statusCode}');
+      //print('Resposta: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -81,7 +81,7 @@ class ApiService {
         };
       }
     } catch (e) {
-      print('Erro na requisição: $e');
+      //print('Erro na requisição: $e');
       return {
         'success': false,
         'message': 'Erro de conexão. Verifique se o servidor está rodando.',
@@ -95,10 +95,10 @@ class ApiService {
     required String tipo,
   }) async {
     try {
-      print(
-        'Enviando requisição de login para: ${ApiConfig.baseUrl}${ApiConfig.usuarioEndpoint}login',
-      );
-      print('Dados: email=$email, tipo=$tipo');
+      //print(
+      //  'Enviando requisição de login para: ${ApiConfig.baseUrl}${ApiConfig.usuarioEndpoint}login',
+      //);
+      //print('Dados: email=$email, tipo=$tipo');
 
       final response = await http
           .post(
@@ -115,8 +115,8 @@ class ApiService {
           )
           .timeout(const Duration(seconds: 10));
 
-      print('Status code: ${response.statusCode}');
-      print('Resposta: ${response.body}');
+      //print('Status code: ${response.statusCode}');
+      //print('Resposta: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -135,11 +135,56 @@ class ApiService {
         };
       }
     } catch (e) {
-      print('Erro na requisição de login: $e');
+      //print('Erro na requisição de login: $e');
       return {
         'success': false,
         'message': 'Erro de conexão. Verifique sua internet e tente novamente.',
       };
     }
   }
+  
+  // Login com Google
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String googleToken,
+    required String tipo,
+    String? tipoRequisicao,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.usuarioEndpoint}login/google'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'googleToken': googleToken,
+          'usuarioTipo': tipo,
+          'tipoRequisicao': tipoRequisicao ?? 'LOGIN',
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final usuario = Usuario.fromJson(data['usuario']);
+        return {
+          'success': true,
+          'token': data['token'],
+          'usuario': usuario,
+          'message': data['message'],
+        };
+      } else {
+        final error = json.decode(response.body);
+        return {
+          'success': false,
+          'message': error['error'] ?? 'Erro ao fazer login com Google',
+        };
+      }
+    } catch (e) {
+      print('Erro na requisição: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão: ${e.toString()}',
+      };
+    }
+  }
+
 }

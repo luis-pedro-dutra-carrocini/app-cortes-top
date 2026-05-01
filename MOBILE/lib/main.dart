@@ -73,6 +73,7 @@ class _AuthCheckState extends State<AuthCheck> {
   Future<void> _verificarAutenticacao() async {
     try {
       final resultado = await _authService.verificarAutenticacao();
+      //.print('Resultado da verificação de autenticação: $resultado');
       
       if (mounted) {
         if (resultado['autenticado']) {
@@ -89,7 +90,7 @@ class _AuthCheckState extends State<AuthCheck> {
         });
       }
     } catch (e) {
-      print('Erro ao verificar autenticação: $e');
+      //print('Erro ao verificar autenticação: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

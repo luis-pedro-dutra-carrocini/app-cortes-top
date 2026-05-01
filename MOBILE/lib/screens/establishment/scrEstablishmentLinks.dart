@@ -152,7 +152,7 @@ class _VinculosScreenState extends State<VinculosScreen>
 
       if (_isMounted) {
         if (result['success']) {
-          print('Dados recebidos no frontend: ${result['data']}');
+          //print('Dados recebidos no frontend: ${result['data']}');
           setState(() {
             _vinculos = result['data'] ?? [];
             _isLoadingVinculados = false;

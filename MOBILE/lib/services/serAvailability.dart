@@ -56,12 +56,12 @@ class DisponibilidadeService {
               .toList();
         }
 
-        print('Disponibilidades carregadas: ${disponibilidades.length}');
-        print('Agrupamentos: ${agrupadoPorData.length}');
+        //print('Disponibilidades carregadas: ${disponibilidades.length}');
+        //print('Agrupamentos: ${agrupadoPorData.length}');
         if (dataInicio != null && dataFim != null) {
-          print(
-            'Período: ${_formatDateForApi(dataInicio)} até ${_formatDateForApi(dataFim)}',
-          );
+          //print(
+          //  'Período: ${_formatDateForApi(dataInicio)} até ${_formatDateForApi(dataFim)}',
+          //);
         }
 
         return {
@@ -80,7 +80,7 @@ class DisponibilidadeService {
         };
       }
     } catch (e) {
-      print('Erro detalhado: $e');
+      //print('Erro detalhado: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }

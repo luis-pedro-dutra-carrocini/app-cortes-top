@@ -19,6 +19,9 @@ class Usuario {
   // Campos específicos para EMPRESA
   String? cnpj;
 
+  // Tipo de cadastro
+  String? tipoCadastro;
+
   Usuario({
     this.id,
     required this.nome,
@@ -35,29 +38,34 @@ class Usuario {
     this.cidade,
     this.estado,
     this.cnpj,
+    this.tipoCadastro,
   });
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
-      id: json['UsuarioId'],
-      nome: json['UsuarioNome'],
-      telefone: json['UsuarioTelefone'],
-      email: json['UsuarioEmail'],
-      tipo: json['UsuarioTipo'],
-      dataCriacao: json['UsuarioDtCriacao'] != null
-          ? DateTime.parse(json['UsuarioDtCriacao'])
-          : null,
-      ativo: json['UsuarioAtivo'] ?? true,
+      id: json['usuarioId'] ?? json['UsuarioId'], // Tenta camelCase primeiro
+      nome: json['usuarioNome'] ?? json['UsuarioNome'] ?? '',
+      telefone: json['usuarioTelefone'] ?? json['UsuarioTelefone'] ?? '',
+      email: json['usuarioEmail'] ?? json['UsuarioEmail'] ?? '',
+      tipo: json['usuarioTipo'] ?? json['UsuarioTipo'] ?? '',
+      dataCriacao: json['usuarioDtCriacao'] != null
+          ? DateTime.parse(json['usuarioDtCriacao'])
+          : (json['UsuarioDtCriacao'] != null
+                ? DateTime.parse(json['UsuarioDtCriacao'])
+                : null),
+      ativo: json['usuarioAtivo'] ?? json['UsuarioAtivo'] ?? true,
       // Endereço
-      cep: json['EnderecoCEP'],
-      rua: json['EnderecoRua'],
-      numero: json['EnderecoNumero'],
-      complemento: json['EnderecoComplemento'],
-      bairro: json['EnderecoBairro'],
-      cidade: json['EnderecoCidade'],
-      estado: json['EnderecoEstado'],
+      cep: json['enderecoCEP'] ?? json['EnderecoCEP'],
+      rua: json['enderecoRua'] ?? json['EnderecoRua'],
+      numero: json['enderecoNumero'] ?? json['EnderecoNumero'],
+      complemento: json['enderecoComplemento'] ?? json['EnderecoComplemento'],
+      bairro: json['enderecoBairro'] ?? json['EnderecoBairro'],
+      cidade: json['enderecoCidade'] ?? json['EnderecoCidade'],
+      estado: json['enderecoEstado'] ?? json['EnderecoEstado'],
       // CNPJ para empresa
-      cnpj: json['EmpresaCNPJ'],
+      cnpj: json['empresaCNPJ'] ?? json['EmpresaCNPJ'],
+      // Tipo de Cadastro
+      tipoCadastro: json['usuarioTipoCadastro'] ?? json['UsuarioTipoCadastro'] ?? json['EmpresaTipoCadastro'],
     );
   }
 
@@ -113,7 +121,6 @@ class Usuario {
 
   // Factory para criar de JSON string
   factory Usuario.fromJsonString(String jsonString) {
-
     // Extrair valores manualmente (ou usar json.decode)
     final idMatch = RegExp(r'"UsuarioId": (\d+)').firstMatch(jsonString);
     final nomeMatch = RegExp(

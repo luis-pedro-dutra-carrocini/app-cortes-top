@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cortes_top/services/serApi.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import '../services/serApi.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../services/serAuthSocial.dart';
+import '../services/serAuth.dart';
+import '../providers/proUser.dart';
+import '../models/modUser.dart';
+import 'scrHome.dart';
 
 class CadastroScreen extends StatefulWidget {
   const CadastroScreen({super.key});
@@ -31,6 +37,9 @@ class _CadastroScreenState extends State<CadastroScreen> {
   final _cepController = TextEditingController();
 
   final _cnpjController = TextEditingController();
+
+  final SocialAuthService _socialAuthService = SocialAuthService();
+  final AuthService _authService = AuthService();
 
   // Máscaras
   final _telefoneMask = MaskTextInputFormatter(
@@ -166,18 +175,68 @@ class _CadastroScreenState extends State<CadastroScreen> {
     }
   }
 
-  void _limparCamposEndereco({bool excetoCep = false}) {
+  // Modifique o método _loginWithGoogle para mostrar o modal primeiro
+  Future<void> _loginWithGoogle() async {
+    // Primeiro mostra o modal para selecionar o tipo
+    await _mostrarModalSelecionarTipoCadastro();
+  }
+
+  // Novo método para continuar com o cadastro após selecionar o tipo
+  Future<void> _continuarCadastroComGoogle(String tipoUsuario) async {
     setState(() {
-      if (!excetoCep) _cepController.clear();
-      _ruaController.clear();
-      _bairroController.clear();
-      _cidadeController.clear();
-      _estadoController.clear();
-      _numeroController.clear();
-      _complementoController.clear();
-      _cepConsultado = false;
-      _ultimoCepConsultado = null;
+      _isLoading = true;
     });
+
+    try {
+      // Obter token do Google
+      final googleResult = await _socialAuthService.loginWithGoogle();
+
+      if (!googleResult['success']) {
+        if (mounted) {
+          _mostrarDialogErro(googleResult['error']);
+        }
+        return;
+      }
+
+      // Enviar token para o backend com o tipo selecionado
+      final result = await _apiService.loginWithGoogle(
+        googleToken: googleResult['token'],
+        tipo: tipoUsuario, // Usando o tipo selecionado no modal
+        tipoRequisicao: 'CADASTRO', // Mantém CADASTRO para registro
+      );
+
+      if (mounted) {
+        if (result['success']) {
+          final usuario = result['usuario'] as Usuario;
+          final token = result['token'] as String;
+
+          await _authService.saveUserData(token, usuario);
+
+          final usuarioProvider = Provider.of<UsuarioProvider>(
+            context,
+            listen: false,
+          );
+          usuarioProvider.setUsuario(usuario, token);
+
+          _mostrarDialogSucessoSocial(usuario, token);
+        } else {
+          _mostrarDialogErro(result['message']);
+        }
+      }
+    } catch (e) {
+      print('Erro no cadastro com Google: $e');
+      if (mounted) {
+        _mostrarDialogErro(
+          'Erro ao fazer cadastro com Google: ${e.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _cadastrar() async {
@@ -285,7 +344,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
         });
       }
 
-      print('Dados a serem enviados: $dados'); // Log para debug
+      //print('Dados a serem enviados: $dados'); // Log para debug
 
       final result = await _apiService.cadastrarUsuario(dados);
 
@@ -295,13 +354,191 @@ class _CadastroScreenState extends State<CadastroScreen> {
         _mostrarDialogErro(result['message']);
       }
     } catch (e) {
-      print('Erro no cadastro: $e'); // Log para debug
+      //print('Erro no cadastro: $e'); // Log para debug
       _mostrarDialogErro('Erro inesperado: $e');
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  // Adicione este método para mostrar o modal de seleção de tipo no cadastro
+  Future<void> _mostrarModalSelecionarTipoCadastro() async {
+    String? tipoSelecionado;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text(
+                'Selecionar Tipo de Cadastro',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A5C6B),
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Como você deseja se cadastrar no sistema?',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  // Opção Cliente
+                  _buildModalTipoRadioCadastro(
+                    value: 'CLIENTE',
+                    label: 'Cliente',
+                    icon: Icons.person,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Opção Prestador
+                  _buildModalTipoRadioCadastro(
+                    value: 'PRESTADOR',
+                    label: 'Prestador',
+                    icon: Icons.work_outline,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Opção Empresa
+                  _buildModalTipoRadioCadastro(
+                    value: 'EMPRESA',
+                    label: 'Empresa',
+                    icon: Icons.business,
+                    selectedValue: tipoSelecionado,
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        tipoSelecionado = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Cancelar',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: tipoSelecionado == null
+                      ? null
+                      : () {
+                          Navigator.pop(context, tipoSelecionado);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A5C6B),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Continuar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((selectedType) async {
+      if (selectedType != null) {
+        // Se o usuário selecionou um tipo, continua com o cadastro do Google
+        await _continuarCadastroComGoogle(selectedType);
+      }
+    });
+  }
+
+  // Widget para as opções de rádio no modal de cadastro
+  Widget _buildModalTipoRadioCadastro({
+    required String value,
+    required String label,
+    required IconData icon,
+    required String? selectedValue,
+    required Function(String) onChanged,
+  }) {
+    return GestureDetector(
+      onTap: () => onChanged(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: selectedValue == value
+              ? const Color(0xFF4A5C6B).withOpacity(0.1)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selectedValue == value
+                ? const Color(0xFF4A5C6B)
+                : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selectedValue == value
+                  ? const Color(0xFF4A5C6B)
+                  : Colors.grey,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: selectedValue == value
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: selectedValue == value
+                      ? const Color(0xFF4A5C6B)
+                      : Colors.black87,
+                ),
+              ),
+            ),
+            Radio<String>(
+              value: value,
+              groupValue: selectedValue,
+              onChanged: (newValue) {
+                if (newValue != null) {
+                  onChanged(newValue);
+                }
+              },
+              activeColor: const Color(0xFF4A5C6B),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _limparCamposEndereco({bool excetoCep = false}) {
+    setState(() {
+      if (!excetoCep) _cepController.clear();
+      _ruaController.clear();
+      _bairroController.clear();
+      _cidadeController.clear();
+      _estadoController.clear();
+      _numeroController.clear();
+      _complementoController.clear();
+      _cepConsultado = false;
+      _ultimoCepConsultado = null;
+    });
   }
 
   void _mostrarDialogSucesso(String mensagem) {
@@ -323,6 +560,59 @@ class _CadastroScreenState extends State<CadastroScreen> {
               style: TextStyle(
                 color: Color(0xFF4A5C6B),
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogSucessoSocial(Usuario usuario, String token) {
+    // Salvar dados antes de navegar
+    _authService.saveUserData(token, usuario);
+
+    // Adicionado parâmetro token
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Bem-vindo!',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Olá, ${usuario.nome}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Fechar dialog
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    usuario: usuario,
+                    token: token, // Usando o token
+                  ),
+                ),
+              );
+            },
+            child: const Text(
+              'Continuar',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A5C6B),
               ),
             ),
           ),
@@ -922,6 +1212,70 @@ class _CadastroScreenState extends State<CadastroScreen> {
                 ),
 
                 const SizedBox(height: 16),
+
+                // Divisor "ou"
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'ou',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                // Opções de login social (opcional)
+                // Botão Google
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _loginWithGoogle,
+                  icon: Image.asset(
+                    'assets/google_logo.png',
+                    height: 24,
+                    width: 24,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.g_mobiledata, size: 24),
+                  ),
+                  label: const Text(
+                    'Cadastrar-se com Google',
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Botão Apple
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // TODO: Implementar login com Apple
+                  },
+                  icon: const Icon(Icons.apple, color: Colors.black),
+                  label: const Text(
+                    'Cadastrar-se com Apple',
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
 
                 // Link para login
                 Row(

@@ -31,8 +31,8 @@ class _DetalheAgendamentoPrestadorScreenState
   void initState() {
     super.initState();
     _agendamento = widget.agendamento;
-    print('PAsou -----------------------------------------------------');
-    print(_agendamento.servicos);
+    //print('PAsou -----------------------------------------------------');
+    //print(_agendamento.servicos);
     _agendamento.statusDescricao = _agendamento.status;
     if (_agendamento.statusDescricao == 'EM_ANDAMENTO') {
       _agendamento.statusDescricao = 'EM ATENDIMENTO';

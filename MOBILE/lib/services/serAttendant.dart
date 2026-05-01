@@ -140,7 +140,7 @@ class PrestadorService {
 
       final url =
           '${ApiConfig.baseUrl}${ApiConfig.disponibilidadeEndpoint}prestador/$prestadorId/data/$dataFormatada';
-      print('URL da requisição: $url');
+      //print('URL da requisição: $url');
 
       final response = await http.get(
         Uri.parse(url),
@@ -150,8 +150,8 @@ class PrestadorService {
         },
       );
 
-      print('Status code: ${response.statusCode}');
-      print('Resposta: ${response.body}');
+      //print('Status code: ${response.statusCode}');
+      //print('Resposta: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -162,7 +162,7 @@ class PrestadorService {
         if (responseData['data'] != null) {
           disponibilidades = (responseData['data'] as List).map((item) {
             // ADAPTAR os campos da API para o modelo existente
-            print('Item da API: $item');
+            //print('Item da API: $item');
 
             // Criar um mapa com os campos no formato esperado pelo modelo
             Map<String, dynamic> adaptedItem = {
@@ -188,7 +188,7 @@ class PrestadorService {
         };
       }
     } catch (e) {
-      print('Erro detalhado: $e');
+      //print('Erro detalhado: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }

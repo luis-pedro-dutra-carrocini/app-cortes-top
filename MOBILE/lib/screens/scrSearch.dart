@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import '../services/serSearch.dart';
 import '../providers/proUser.dart';
+import '../services/serScheduling.dart';
 import 'scheduling/scrSchedulingNew.dart';
 
 class PesquisaScreen extends StatefulWidget {
@@ -19,8 +20,11 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
   bool _isLoading = false;
   String _selectedType = 'todos';
   final Set<int> _expandedItems = {};
+  String _uuid = '';
 
-   dynamic _empresaSelecionada;
+  final AgendamentoService _agendamentoService = AgendamentoService();
+
+  dynamic _empresaSelecionada;
 
   final Map<String, String> _tipos = {
     'todos': 'Todos',
@@ -104,32 +108,52 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
     }
   }
 
-  void _iniciarAgendamento(dynamic item) {
+  void _iniciarAgendamento(dynamic item) async {
     final tipo = item['tipo'];
 
-    if (tipo == 'PRESTADOR') {
-      // Navegar para tela de agendamento com prestador
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NovoAgendamentoScreen(
-            prestadorId: item['id'],
-            prestadorNome: item['nome'],
+    final usuarioProvider = Provider.of<UsuarioProvider>(
+      context,
+      listen: false,
+    );
+    final token = usuarioProvider.token;
+
+    if (token == null) return;
+
+    final result = await _agendamentoService.iniciarAgendamento(
+      token: token,
+      tela: 'MOBILE_PESQUISA',
+    );
+
+    //print('AQUIIIIIIIIIIIIIIIIIIII11111:  ' + mounted.toString() + ' - ' + result.toString());
+    if (mounted && result['success']) {
+      _uuid = result['uuid'].toString();
+      //print('AQUIIIIIIIIIIIIIIIIIIII:  ' + _uuid);
+      if (tipo == 'PRESTADOR') {
+        // Navegar para tela de agendamento com prestador
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NovoAgendamentoScreen(
+              prestadorId: item['id'],
+              prestadorNome: item['nome'],
+              uuid: _uuid,
+            ),
           ),
-        ),
-      );
-    } else if (tipo == 'ESTABELECIMENTO') {
-      // Navegar para tela de agendamento com estabelecimento
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NovoAgendamentoScreen(
-            estabelecimentoId: item['id'],
-            estabelecimentoNome: item['nome'],
-            empresaId: item['empresa']?['id'],
+        );
+      } else if (tipo == 'ESTABELECIMENTO') {
+        // Navegar para tela de agendamento com estabelecimento
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NovoAgendamentoScreen(
+              estabelecimentoId: item['id'],
+              estabelecimentoNome: item['nome'],
+              empresaId: item['empresa']?['id'],
+              uuid: _uuid,
+            ),
           ),
-        ),
-      );
+        );
+      }
     }
   }
 
@@ -606,7 +630,7 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
 
   Widget _buildEstabelecimentoItem(dynamic estabelecimento) {
     estabelecimento['tipo'] = 'ESTABELECIMENTO';
-    print(estabelecimento);
+    //print(estabelecimento);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

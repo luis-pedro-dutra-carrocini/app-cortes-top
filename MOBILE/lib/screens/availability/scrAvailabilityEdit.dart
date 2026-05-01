@@ -38,8 +38,8 @@ class _EditarDisponibilidadeScreenState
   void initState() {
     super.initState();
     _disponibilidade = widget.disponibilidade;
-    print('Disponibilidade recebida: ${_disponibilidade.toJson()}'); // LOG
-    print('EstabelecimentoId: ${_disponibilidade.estabelecimentoId}'); // LOG
+    //print('Disponibilidade recebida: ${_disponibilidade.toJson()}'); // LOG
+    //print('EstabelecimentoId: ${_disponibilidade.estabelecimentoId}'); // LOG
     _preencherCampos();
     _carregarEstabelecimentosVinculados();
   }
