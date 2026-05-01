@@ -12,7 +12,3 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
-
-/android/app/build.gradle.kts
-google-services.json
-problems-report.html
