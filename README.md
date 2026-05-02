@@ -1,6 +1,7 @@
-# Cortes Top - Aplicativo de Gerenciamento de Agendamentos de Serviços
+# Agendamentos de Serviços
 
 Esse projeto se trata de um aplicativo onde um Prestador (Barbeiro) poderá cadastrar o seu salão, onde os Clientes poderão reservar um horário para atendimento de acordo com a disponibilidade do Prestador. Ele foi criado a fim de atender a necessidade de um projeto Mobile com comunicação com API Rest da disciplina "Laboratório de Desenvolvimento para Dispositivos Móveis" do 5° Semestre do curso DSM - FATEC Franca.
+<br>
 
 ## 📄 Descrição
 
@@ -25,52 +26,50 @@ O APP apresenta as seguintes fucionalidades:
 * Gerenciar Disponibilidade: O Prestador poderá gerenciar a sua disponibilidade dia após dia, informando os horários em que está disponível para o atendimento.
 
 * Gerenciar Agendamentos: O Prestador pode gerenciar os agendamentos abertos pelos Clientes, a fim de se organizar, podendo excluí-los se desejar, enviando assim uma notificação ao Cliente.
-
-## 📒 [Documentação do Projeto](https://luis-pedro-dutra-carrocini.github.io)
+<br>
 
 ## 📦 Aparência
 
-### Tela de Login e Cadastro
-<img src="/public/prints/sebre1.png">
+### Tela de Login (Cliente, Prestador e Empresa)
+<img src="/DOC/prints/login.png">
 <br>
 
-### Home (Cliente e Prestador)
-<img src="/public/prints/sebre1.png">
+### Tela de Cadastro (Cliente, Prestador e Empresa)
+<img src="/DOC/prints/cadastrar-se.png">
 <br>
 
-### Gerenciar Serviços
-<img src="/public/prints/pedido1.png">
+### Home (Cliente, Prestador e Empresa)
+<img src="/DOC/prints/home.png">
 <br>
 
-### Gerenciar Agendamentos
-<img src="/public/prints/login1.png">
+### Perfil (Cliente, Prestador e Empresa)
+<img src="/DOC/prints/perfil.png">
 <br>
 
-### Perfil (Cliente e Prestador)
-<img src="/public/prints/carrinho1.png">
+### Criar Agendamentos (Cliente)
+<img src="/DOC/prints/criar-agendamento1.png">
+<img src="/DOC/prints/criar-agendamento2.png">
 <br>
 
-### Perquisar Prestadores
-<img src="/public/prints/dadoscliente1.png">
+### Histórico Agendamentos (Cliente)
+<img src="/DOC/prints/historico.png">
 <br>
 
-## 📃 Obter cópia
+### Perquisar Prestadores/Estabelcimentos/Empresas (Cliente)
+<img src="/DOC/prints/pesquisa.png">
+<br>
 
-Para obter uma cópia basta baixar todos os arquivos presentes nesse repositório, criando primeiro o BD com nome correspondente, depois de deve entrar na pasta "API" copiada, depois executar os comandos ("npm i", "npx prisma generate" e "npx prisma db push") no terminal do back-end para a geração das tabelas no BD. No final  executar "npm start" para executar a API.
+### Dashboard, Estabelecimentos, Serviços e Agendamentos (Empresa)
+<img src="/DOC/prints/dashboard-estabelecimento-agendamento-servico-empresa.png">
+<br>
 
-Posteriomente baixe os arquivos da pasta "MOBILE", ajuste o arquivo (lib/config/conApi.dart) para incluir a URL correta da API. Depois execute a emulação do APP em um emulador de preferência, ou inicie os passo abaixo para gerar o APK.
+### Dashboard, Serviços e Agendamentos (Prestador)
+<img src="/DOC/prints/dashboard-agendamentos-prestador.png">
+<br>
 
-Para gerar o APK do APP:
-
-Após gerar, colocar os passos aqui......
-
-## 📋 Pré-requisitos
-
-Para que o APP possa apresentar pleno funcionamento, são necessários os seguintes recursos:
-
-* A máquina onde for instalada a API deve ter o BD PostgreSQL e Node.js instalados.
-
-* Instalaras dependencias relatadas anteriormente
+### Disponibilidade (Prestador)
+<img src="/DOC/prints/disponibilidades-prestador.png">
+<br>
 
 ## 🛠️ Construído com
 
@@ -91,6 +90,6 @@ Linguagens, Frameworks e API's:
 
 ## ✒️ Autores
 
-* **[Cláudio de Melo Júnior](https://github.com/Claudio-Fatec)** — Atividades;
-* **[João Vitor Nicolau](https://github.com/Joao-Vitor-Nicolau-dos-Santos)** — Atividades;
-* **[Luís Pedro Dutra Carrocini](https://github.com/luis-pedro-dutra-carrocini)** — Atividades;
+* **[Cláudio de Melo Júnior](https://github.com/Claudio-Fatec)** — Criação das telas (Establishment e Availability);
+* **[João Vitor Nicolau dos Santos](https://github.com/Joao-Vitor-Nicolau-dos-Santos)** — Criação das telas (Scheduling e SchedulingAttendant);
+* **[Luís Pedro Dutra Carrocini](https://github.com/luis-pedro-dutra-carrocini)** — Criação da API/BD - Criação dos Services, Models e demais telas;

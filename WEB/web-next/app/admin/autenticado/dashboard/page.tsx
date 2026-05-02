@@ -108,24 +108,6 @@ export default function AdminDashboard() {
       icon: UserCog,
       color: "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400"
     },
-    {
-      title: "Iniciados por Pesquisa",
-      value: data.agendamentosIniciadosPorBotao.pesquisa,
-      icon: Search,
-      color: "bg-cyan-100 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400"
-    },
-    {
-      title: "Iniciados Botão Central",
-      value: data.agendamentosIniciadosPorBotao.botaoCentral,
-      icon: Layout,
-      color: "bg-pink-100 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400"
-    },
-    {
-      title: "Iniciados Botão Tela",
-      value: data.agendamentosIniciadosPorBotao.botaoTela,
-      icon: MousePointer,
-      color: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
-    },
   ]
 
   return (

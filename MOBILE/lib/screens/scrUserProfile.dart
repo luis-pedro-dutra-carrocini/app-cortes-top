@@ -746,7 +746,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         child: Text(
                           _usuario.tipo == 'PRESTADOR'
                               ? 'Prestador de Serviços'
-                              : 'Cliente',
+                              : _usuario.tipo == 'EMPRESA' ? 'Empresa' : 'Cliente',
                           style: const TextStyle(
                             color: Color(0xFF4A5C6B),
                             fontWeight: FontWeight.w500,
